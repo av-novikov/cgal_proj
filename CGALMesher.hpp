@@ -73,31 +73,31 @@ namespace cgalmesher
 			}
 			void operator()(const Src&, Res&) const { }
 		};
-
 		template<typename Src, typename Res>
 		struct DefaultCellConverter {
 			Res operator()(const Src& src) const {
 				Res res;
 				// copy cell info
-				res.info().setGridId(src.info());
+				//res.info().setGridId(src.info());
 				return res;
 			}
 			void operator()(const Src&, Res&) const { }
 		};
-
 		template<typename Src, typename Res, typename Tr>
 		struct BodiesCellConverter {
 
-			Res operator()(const Src& src) const {
+			Res operator()(const Src& src) const 
+			{
 				Res res;
-				res.info() = (size_t)(-1);
+				//res.info() = (size_t)(-1);
 
 				if (!src.is_in_domain()) { return res; }
 
 				int containsCounter = 0;
 				for (const auto& body : *bodies) {
-					if (body.contains(centroid(src))) {
-						res.info() = body.id;
+					if (body.contains(centroid(src))) 
+					{
+						//res.info() = body.id;
 						++containsCounter;
 					}
 				}
@@ -108,15 +108,12 @@ namespace cgalmesher
 
 			void operator()(const Src&, Res&) const { }
 
-			BodiesCellConverter(const std::vector<CgalBody>* bodies_,
-				const Tr* tr_) : bodies(bodies_), tr(tr_) { }
+			BodiesCellConverter(const std::vector<CgalBody>* _bodies, const Tr* _tr) : bodies(_bodies), tr(_tr) { }
 
 		private:
 			const std::vector<CgalBody>* bodies;
 			const Tr* const tr;
 		};
-
-		/// @}
 
 
 		/**

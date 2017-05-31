@@ -1,6 +1,9 @@
 #ifndef TRIANGLEMESH_HPP_
 #define TRIANGLEMESH_HPP_
 
+#include <array>
+#include <set>
+
 #include "Cell.hpp"
 #include "AbstractMesh.hpp"
 #include "CGALMesher.hpp"
@@ -9,7 +12,7 @@ struct Task
 {
 	double spatialStep;
 	struct Body {
-		typedef point::Point2d Point;
+		typedef std::array<double, 2> Point;
 		typedef std::vector<Point> Border;
 
 		size_t id;                  ///< body indicator > 0 @see Task::Body
@@ -19,27 +22,45 @@ struct Task
 	std::vector<Body> bodies;
 };
 
-template<int CELL_POINTS_NUMBER>
-struct CellInfoT {
-	/// Indicator that no grid owns the cell (auxiliary empty cell)
-	static const GridId EmptySpaceFlag = (GridId)(-1);
-
-	/// global triangulation cell can belongs to the only one grid
-	GridId gridId;
-	void setGridId(const GridId gridId_) { gridId = gridId_; }
-	GridId getGridId() const { return gridId; }
-
-	/// local indices of the cell's vertices in the order
-	/// the same with their pointers (VertexHandles)
-	typedef size_t LocalVertexIndex;
-	LocalVertexIndex localVertexIndices[CELL_POINTS_NUMBER];
-};
-
-/** Auxiliary information stored in global triangulation vertices */
-typedef size_t VertexInfo;
-
 namespace mesh
 {
+	enum CellType { INNER, BORDER_IN, BORDER_OUT };
+	struct CellInfo
+	{
+		typedef size_t LocalVertexIndex;
+		LocalVertexIndex localVertexIndices[3];
+		CellType type;
+	};
+	typedef size_t VertexInfo;
+	struct Iterator {
+		typedef size_t Index;
+
+		Index iter = 0;
+
+		Iterator(size_t value = 0) : iter(value) { }
+
+		operator Index() const { return iter; }
+
+		const Iterator& operator*() const { return *this; }
+
+		bool operator==(const Iterator& other) const {
+			return iter == other.iter;
+		}
+
+		bool operator!=(const Iterator& other) const {
+			return !((*this) == other);
+		}
+
+		bool operator<(const Iterator& other) const {
+			return iter < other.iter;
+		}
+
+		Iterator& operator++() {
+			iter++;
+			return (*this);
+		}
+	};
+
 	template <typename TVariable>
 	class TriangleMesh : public AbstractMesh<cell::TriangleCell<TVariable> >
 	{
@@ -58,9 +79,54 @@ namespace mesh
 		typedef typename Triangulation::All_faces_iterator      AllCellsIterator;
 		typedef typename Triangulation::Line_face_circulator    LineFaceCirculator;
 
+		typedef typename Triangulation::CellHandle             CellHandle;
+		typedef typename Triangulation::VertexHandle           VertexHandle;
+		typedef Iterator::Index LocalVertexIndex;
+		typedef typename std::vector<CellHandle>::const_iterator CellIterator;
+
+		static const int CELL_POINTS_NUMBER = 3;
+	private:
+		Triangulation triangulation;
+		std::vector<CellHandle> cellHandles;
+		std::vector<VertexHandle> vertexHandles;
+		std::vector<LocalVertexIndex> borderIndices;
+		std::vector<LocalVertexIndex> innerIndices;
+
+		/*std::list<CellHandle> localIncidentCells(const LocalVertexIndex it) const {
+			VertexHandle vh = vertexHandle(it);
+			std::list<CellHandle> ans = triangulation->allIncidentCells(vh);
+			auto listIter = ans.begin();
+			while (listIter != ans.end()) {
+				if (belongsToTheGrid(*listIter)) {
+					++listIter;
+				}
+				else {
+					listIter = ans.erase(listIter);
+				}
+			}
+			return ans;
+		}*/
+
+		/*CellType cellState(const LocalVertexIndex it) const 
+		{
+			std::set<GridId> incidentGrids = gridsAroundVertex(it);
+			assert_true(incidentGrids.erase(id));
+			if (incidentGrids.empty()) { return BorderState::INNER; }
+			if (incidentGrids.size() > 1) { return BorderState::MULTICONTACT; }
+			if (*incidentGrids.begin() == EmptySpaceFlag) { return BorderState::BORDER; }
+			return BorderState::CONTACT;
+		}*/
+
+
 	public:
 		TriangleMesh() {};
 		TriangleMesh(const Task& task) 
+		{
+			load(task);
+		};
+		~TriangleMesh() {};
+
+		void load(const Task& task)
 		{
 			typedef cgalmesher::Cgal2DMesher::TaskBody Body;
 			std::vector<Body> bodies;
@@ -68,10 +134,27 @@ namespace mesh
 				bodies.push_back({ b.id, b.outer, b.inner });
 
 			cgalmesher::Cgal2DMesher::triangulate(task.spatialStep, bodies, triangulation);
-		};
-		~TriangleMesh() {};
 
-		Triangulation triangulation;
+			std::set<VertexHandle> localVertices;
+			for (auto cellIter = triangulation->allCellsBegin(); cellIter != triangulation->allCellsEnd(); ++cellIter) 
+			{
+				//if (cellIter->info().getGridId() == id) 
+				//{
+					cellHandles.push_back(cellIter);
+					for (int i = 0; i < CELL_POINTS_NUMBER; i++)
+						localVertices.insert(cellIter->vertex(i));
+				//}
+			}
+			vertexHandles.assign(localVertices.begin(), localVertices.end());
+
+			for (size_t i = 0; i < vertexHandles.size(); i++)
+				vertexHandles[i]->info() = i;
+			for (CellIterator cell = cellHandles.begin(); cell != cellHandles.end(); ++cell)
+				for (int i = 0; i < CELL_POINTS_NUMBER; i++)
+					(*cell)->info().localVertexIndices[i] = (*cell)->vertex(i)->info();
+
+
+		};
 	};
 };
 

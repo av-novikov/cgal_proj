@@ -154,10 +154,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CGALMesher.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AbstractMesh.hpp" />
+    <ClInclude Include="CGALMesher.hpp" />
     <ClInclude Include="Element.hpp" />
     <ClInclude Include="Cell.hpp" />
     <ClInclude Include="TriangleMesh.hpp" />
