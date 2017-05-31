@@ -27,8 +27,8 @@ namespace mesh
 	enum CellType { INNER, BORDER_IN, BORDER_OUT };
 	struct CellInfo
 	{
-		typedef size_t LocalVertexIndex;
-		LocalVertexIndex localVertexIndices[3];
+		size_t localVertexIndices[3];
+		size_t localNeighborIndices[3];
 		CellType type;
 	};
 	typedef size_t VertexInfo;
@@ -72,17 +72,14 @@ namespace mesh
 		/// The triangulation type
 		typedef CGAL::Delaunay_triangulation_2<K, Tds>                     Triangulation;
 
-		typedef typename Triangulation::Vertex_handle           VertexHandle;
-		typedef typename Triangulation::Face_handle             CellHandle;
-		typedef typename Triangulation::Geom_traits::Vector_2   CgalVectorD;
-		typedef typename Triangulation::Point                   CgalPointD;
-		typedef typename Triangulation::All_faces_iterator      AllCellsIterator;
-		typedef typename Triangulation::Line_face_circulator    LineFaceCirculator;
-
-		typedef typename Triangulation::CellHandle             CellHandle;
-		typedef typename Triangulation::VertexHandle           VertexHandle;
+		typedef Triangulation::Vertex_handle           VertexHandle;
+		typedef Triangulation::Face_handle             CellHandle;
+		typedef Triangulation::Geom_traits::Vector_2   CgalVectorD;
+		typedef Triangulation::Point                   CgalPointD;
+		typedef Triangulation::All_faces_iterator      AllCellsIterator;
+		typedef Triangulation::Line_face_circulator    LineFaceCirculator;
 		typedef Iterator::Index LocalVertexIndex;
-		typedef typename std::vector<CellHandle>::const_iterator CellIterator;
+		typedef std::vector<CellHandle>::const_iterator CellIterator;
 
 		static const int CELL_POINTS_NUMBER = 3;
 	private:
@@ -91,6 +88,8 @@ namespace mesh
 		std::vector<VertexHandle> vertexHandles;
 		std::vector<LocalVertexIndex> borderIndices;
 		std::vector<LocalVertexIndex> innerIndices;
+
+		VTKSnapshotter snapshotter;
 
 		/*std::list<CellHandle> localIncidentCells(const LocalVertexIndex it) const {
 			VertexHandle vh = vertexHandle(it);
@@ -106,7 +105,6 @@ namespace mesh
 			}
 			return ans;
 		}*/
-
 		/*CellType cellState(const LocalVertexIndex it) const 
 		{
 			std::set<GridId> incidentGrids = gridsAroundVertex(it);
@@ -116,7 +114,6 @@ namespace mesh
 			if (*incidentGrids.begin() == EmptySpaceFlag) { return BorderState::BORDER; }
 			return BorderState::CONTACT;
 		}*/
-
 
 	public:
 		TriangleMesh() {};
@@ -136,7 +133,7 @@ namespace mesh
 			cgalmesher::Cgal2DMesher::triangulate(task.spatialStep, bodies, triangulation);
 
 			std::set<VertexHandle> localVertices;
-			for (auto cellIter = triangulation->allCellsBegin(); cellIter != triangulation->allCellsEnd(); ++cellIter) 
+			for (auto cellIter = triangulation.all_faces_begin(); cellIter != triangulation.all_faces_end(); ++cellIter) 
 			{
 				//if (cellIter->info().getGridId() == id) 
 				//{
