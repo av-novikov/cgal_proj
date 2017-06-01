@@ -1,5 +1,4 @@
-#include "TriangleMesh.hpp"
-#include "Variables.hpp"
+#include "Model.hpp"
 
 using namespace std;
 using namespace point;
@@ -11,9 +10,11 @@ int main(int argc, char* argv[])
 	task.spatialStep = 0.2;
 	Task::Body::Border body1border = { { 3, 3 },{ -3, 3 },{ -3, -3 },{ 3, -3 } };
 	Task::Body::Border body2border = { { 3, 3 },{ 9, 3 },{ 9, -3 },{ 3, -3 } };
-	task.bodies = {	Task::Body({ 0, body1border,{} }), Task::Body({ 1, body2border,{} }) };
+	task.bodies = {	Task::Body({ 0, body1border,{} })};
 
-	TriangleMesh<var::Var1phase> mesh(task);
+	FirstModel model;
+	model.mesh = make_shared<FirstModel::Mesh>(task);
+	model.mesh->snapshot(0);
 
 	return 0;
 }

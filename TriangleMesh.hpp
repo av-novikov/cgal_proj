@@ -7,6 +7,7 @@
 #include "Cell.hpp"
 #include "AbstractMesh.hpp"
 #include "CGALMesher.hpp"
+#include "VTKSnapshotter.hpp"
 
 struct Task
 {
@@ -21,6 +22,8 @@ struct Task
 	};
 	std::vector<Body> bodies;
 };
+
+class FirstModel;
 
 namespace mesh
 {
@@ -82,14 +85,14 @@ namespace mesh
 		typedef std::vector<CellHandle>::const_iterator CellIterator;
 
 		static const int CELL_POINTS_NUMBER = 3;
-	private:
+	public:
 		Triangulation triangulation;
 		std::vector<CellHandle> cellHandles;
 		std::vector<VertexHandle> vertexHandles;
 		std::vector<LocalVertexIndex> borderIndices;
 		std::vector<LocalVertexIndex> innerIndices;
 
-		VTKSnapshotter snapshotter;
+		std::shared_ptr<VTKSnapshotter<FirstModel>> snapshotter;
 
 		/*std::list<CellHandle> localIncidentCells(const LocalVertexIndex it) const {
 			VertexHandle vh = vertexHandle(it);
@@ -120,6 +123,7 @@ namespace mesh
 		TriangleMesh(const Task& task) 
 		{
 			load(task);
+			snapshotter = std::make_shared<VTKSnapshotter<FirstModel>>(this);
 		};
 		~TriangleMesh() {};
 
@@ -152,6 +156,10 @@ namespace mesh
 
 
 		};
+		void snapshot(const int i) const
+		{
+			snapshotter->dump(i);
+		}
 	};
 };
 

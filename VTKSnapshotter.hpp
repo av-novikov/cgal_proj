@@ -6,16 +6,19 @@
 template<class modelType>
 class VTKSnapshotter
 {
+public:
+	typedef modelType Model;
+	typedef typename Model::Mesh Mesh;
 private:
 	static const std::string prefix;
 	std::string pattern;
 
-	modelType* model;
+	const Mesh* mesh;
 
 	std::string replace(std::string filename, std::string from, std::string to);
 	std::string getFileName(int i);
 public:
-	VTKSnapshotter();
+	VTKSnapshotter(const Mesh* _mesh);
 	~VTKSnapshotter();
 
 	void dump(const int i);
