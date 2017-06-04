@@ -135,8 +135,7 @@ namespace cgalmesher
 				ResultingTriangulation& result) {
 
 			copyTriangulation<IntermediateTriangulation, ResultingTriangulation,
-				CellConverter, VertexConverter>(
-					triangulate(spatialStep, convert(bodies)), result);
+				CellConverter, VertexConverter>(triangulate(spatialStep, convert(bodies)), result);
 		}
 
 

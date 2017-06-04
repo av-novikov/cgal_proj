@@ -54,15 +54,16 @@ void VTKSnapshotter<FirstModel>::dump(const int i)
 {
 	auto grid = vtkSmartPointer<vtkUnstructuredGrid>::New();
 	auto points = vtkSmartPointer<vtkPoints>::New();
+	auto facets = vtkSmartPointer<vtkCellArray>::New();
+
+	points->Allocate(mesh->triangulation.number_of_vertices());
+	facets->Allocate(mesh->triangulation.number_of_faces());
 
 	for (const auto& vhandle : mesh->vertexHandles)
 	{
 		const auto& pt = vhandle->point();
 		points->InsertNextPoint(pt[0], pt[1], 0.0);
 	}
-	grid->SetPoints(points);
-
-	auto tris= vtkSmartPointer<vtkCellArray>::New();
 	for (const auto& cell : mesh->cellHandles) 
 	{
 		auto vtkCell = vtkSmartPointer<vtkTriangle>::New();
@@ -70,10 +71,11 @@ void VTKSnapshotter<FirstModel>::dump(const int i)
 		for (int i = 0; i < Mesh::CELL_POINTS_NUMBER; i++) 
 			vtkCell->GetPointIds()->SetId(i, cell->info().localVertexIndices[i]);
 
-		tris->InsertNextCell(vtkCell);
+		facets->InsertNextCell(vtkCell);
 	}
 
-	grid->SetCells(VTK_TRIANGLE, tris);
+	grid->SetPoints(points);
+	grid->SetCells(VTK_TRIANGLE, facets);
 	vtkCellData* fd = grid->GetCellData();
 
 	// Writing

@@ -137,7 +137,7 @@ namespace mesh
 			cgalmesher::Cgal2DMesher::triangulate(task.spatialStep, bodies, triangulation);
 
 			std::set<VertexHandle> localVertices;
-			for (auto cellIter = triangulation.all_faces_begin(); cellIter != triangulation.all_faces_end(); ++cellIter) 
+			for (auto cellIter = triangulation.finite_faces_begin(); cellIter != triangulation.finite_faces_end(); ++cellIter) 
 			{
 				//if (cellIter->info().getGridId() == id) 
 				//{
