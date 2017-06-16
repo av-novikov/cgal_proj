@@ -3,12 +3,13 @@
 #include <CGAL/Delaunay_mesh_size_criteria_2.h>
 #include <CGAL/Delaunay_mesher_2.h>
 
+#include <CGAL/lloyd_optimize_mesh_2.h>
 #include "CGALMesher.hpp"
 
 using namespace cgalmesher;
 
-IntermediateTriangulation Cgal2DMesher::triangulate(const double spatialStep, const std::vector<CgalBody> bodies) {
-
+IntermediateTriangulation Cgal2DMesher::triangulate(const double spatialStep, const std::vector<CgalBody> bodies) 
+{
 	typedef CGAL::Delaunay_mesh_face_base_2<K>                  Fb;
 	typedef CGAL::Triangulation_data_structure_2<Vb, Fb>        Tds;
 	typedef CGAL::Constrained_Delaunay_triangulation_2<K, Tds>  CDT;
@@ -22,21 +23,28 @@ IntermediateTriangulation Cgal2DMesher::triangulate(const double spatialStep, co
 	std::list<CgalPoint2> listOfSeeds;
 
 	// insert all bodies to triangulation as its constraints
-	for (const auto& body : bodies) {
+	for (const auto& body : bodies) 
+	{
 		insertPolygon(body.outer, cdt);
-		for (const auto& innerCavity : body.inner) {
+		for (const auto& innerCavity : body.inner) 
+		{
 			insertPolygon(innerCavity, cdt);
-			listOfSeeds.push_back(findInnerPoint(innerCavity));
+			//listOfSeeds.push_back(findInnerPoint(innerCavity));
 		}
+		//listOfSeeds.push_back(CDT::Point(1.0, 1.0));
+		for (const auto& con : body.constraint)
+			cdt.insert_constraint(con.first, con.second);
 	}
 
+
 	Mesher mesher(cdt);
-	mesher.set_seeds(listOfSeeds.begin(), listOfSeeds.end());
+	//listOfSeeds.push_back({ 2.5, 2.5 });
+	//listOfSeeds.push_back({ 0.2, 0.2 });
+	//mesher.set_seeds(listOfSeeds.begin(), listOfSeeds.end());
 	Criteria meshingCriteria;
 	assert(spatialStep > 0);
 	meshingCriteria.set_size_bound(spatialStep);
 	mesher.set_criteria(meshingCriteria);
-
 	// meshing itself
 	mesher.refine_mesh();
 

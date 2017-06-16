@@ -8,6 +8,9 @@
 #include "AbstractMesh.hpp"
 #include "CGALMesher.hpp"
 #include "VTKSnapshotter.hpp"
+#include <utility>
+
+class FirstModel;
 
 struct Task
 {
@@ -15,15 +18,15 @@ struct Task
 	struct Body {
 		typedef std::array<double, 2> Point;
 		typedef std::vector<Point> Border;
+		typedef std::pair<Point, Point> Edge;
 
 		size_t id;                  ///< body indicator > 0 @see Task::Body
 		Border outer;               ///< outer border of the body
 		std::vector<Border> inner;  ///< borders of the inner cavities
+		std::vector<Edge> constraint;
 	};
 	std::vector<Body> bodies;
 };
-
-class FirstModel;
 
 namespace mesh
 {
@@ -132,7 +135,7 @@ namespace mesh
 			typedef cgalmesher::Cgal2DMesher::TaskBody Body;
 			std::vector<Body> bodies;
 			for (const auto& b : task.bodies)
-				bodies.push_back({ b.id, b.outer, b.inner });
+				bodies.push_back({ b.id, b.outer, b.inner, b.constraint });
 
 			cgalmesher::Cgal2DMesher::triangulate(task.spatialStep, bodies, triangulation);
 

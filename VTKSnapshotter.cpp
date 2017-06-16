@@ -22,7 +22,7 @@ const std::string VTKSnapshotter<modelType>::prefix = "";
 template<class modelType>
 VTKSnapshotter<modelType>::VTKSnapshotter(const Mesh* _mesh) : mesh(_mesh)
 {
-	pattern = prefix + "CGA_First_%{STEP}.vtu";
+	pattern = prefix + "CGAL_First_%{STEP}.vtu";
 }
 template<class modelType>
 VTKSnapshotter<modelType>::~VTKSnapshotter()

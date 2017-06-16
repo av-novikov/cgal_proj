@@ -3,6 +3,7 @@
 
 #include <string>
 #include <fstream>
+#include <utility>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
@@ -33,34 +34,41 @@ namespace cgalmesher
 			typedef std::array<double, 2> Point;
 			/// closed simple polygon without self-intersections
 			typedef std::vector<Point>    Border;
+			typedef std::pair<Point, Point> Edge;
 
 			size_t id;                 ///< will be set to cells info
 			Border outer;              ///< outer border of the body
 			std::vector<Border> inner; ///< borders of the inner cavities of the body
+			std::vector<Edge> constraint;
 		};
 
 		/// Body structure used inside the mesher
-		struct CgalBody {
+		struct CgalBody 
+		{
+			typedef K::Point_2 Point;
 			size_t id;                  ///< will be set to cells info
 			Polygon outer;              ///< outer border of the body
 			std::vector<Polygon> inner; ///< borders of the inner cavities of the body
+			std::vector<std::pair<Point,Point>> constraint;
 
-			CgalBody(const TaskBody& task) :
-				id(task.id), outer(makePolygon(task.outer)) {
-				for (const auto& cavity : task.inner) {
+			CgalBody(const TaskBody& task) : id(task.id), outer(makePolygon(task.outer))
+			{
+				for (const auto& cavity : task.inner) 
 					inner.push_back(makePolygon(cavity));
-				}
-			}
-
-			bool contains(const CgalPoint2& p) const {
-				if (outer.has_on_unbounded_side(p)) { return false; }
-				for (const Polygon& cavity : inner) {
-					if (cavity.has_on_bounded_side(p)) { return false; }
-				}
+				for (const auto& con : task.constraint)
+					constraint.push_back(std::make_pair<Point, Point>({ con.first[0], con.first[1] }, 
+																	{ con.second[0], con.second[1] }));
+			};
+			bool contains(const CgalPoint2& p) const 
+			{
+				if (outer.has_on_unbounded_side(p))
+					return false;
+				for (const Polygon& cavity : inner)
+					if (cavity.has_on_bounded_side(p)) 
+						return false;
 				return true;
 			}
 		};
-
 
 		/// @name Converter structures for CGAL copy_tds function --
 		/// convertion between vertices and cells from
@@ -125,15 +133,11 @@ namespace cgalmesher
 		* @tparam CellConverter          see DefaultCellConverter
 		* @tparam VertexConverter        see DefaultVertexConverter
 		*/
-		template<
-			typename ResultingTriangulation,
-			template<typename, typename> class CellConverter = DefaultCellConverter,
-			template<typename, typename> class VertexConverter = DefaultVertexConverter
-		>
-			static void triangulate(
-				const double spatialStep, const std::vector<TaskBody> bodies,
-				ResultingTriangulation& result) {
-
+		template<typename ResultingTriangulation,
+				template<typename, typename> class CellConverter = DefaultCellConverter,
+				template<typename, typename> class VertexConverter = DefaultVertexConverter>
+		static void triangulate(const double spatialStep, const std::vector<TaskBody> bodies, ResultingTriangulation& result) 
+		{
 			copyTriangulation<IntermediateTriangulation, ResultingTriangulation,
 				CellConverter, VertexConverter>(triangulate(spatialStep, convert(bodies)), result);
 		}
@@ -148,15 +152,10 @@ namespace cgalmesher
 		/**
 		* Copy CGAL triangulations of different types
 		*/
-		template<
-			typename InputTriangulation,
-			typename OutputTriangulation,
-			template<typename, typename> class CellConverter,
-			template<typename, typename> class VertexConverter
-		>
-			static void copyTriangulation(const InputTriangulation& input,
-				OutputTriangulation& output) {
-
+		template<typename InputTriangulation,typename OutputTriangulation,template<typename, typename> class CellConverter,
+				template<typename, typename> class VertexConverter>
+		static void copyTriangulation(const InputTriangulation& input, OutputTriangulation& output)
+		{
 			typedef typename InputTriangulation::Face     InputCell;
 			typedef typename InputTriangulation::Vertex   InputVertex;
 			typedef typename OutputTriangulation::Face    OutputCell;
@@ -172,16 +171,10 @@ namespace cgalmesher
 		/**
 		* Copy CGAL triangulations of different types
 		*/
-		template<
-			typename InputTriangulation,
-			typename OutputTriangulation,
-			typename CellConverter,
-			typename VertexConverter
-		>
-			static void copyTriangulation(
-				const InputTriangulation& input, OutputTriangulation& output,
-				const CellConverter& cellConverter,
-				const VertexConverter& vertexConverter) {
+		template<typename InputTriangulation,typename OutputTriangulation,typename CellConverter,typename VertexConverter>
+		static void copyTriangulation(const InputTriangulation& input, OutputTriangulation& output,
+				const CellConverter& cellConverter, const VertexConverter& vertexConverter) 
+		{
 			// try to repeat Triangulation_2 copy constructor as much as possible
 			output.set_infinite_vertex(output.tds().copy_tds(
 				input.tds(), input.infinite_vertex(), vertexConverter, cellConverter));
@@ -193,7 +186,8 @@ namespace cgalmesher
 		static Polygon makePolygon(const TaskBody::Border& points);
 		static CgalPoint2 findInnerPoint(const Polygon& polygon);
 
-		static std::vector<CgalBody> convert(const std::vector<TaskBody>& bodies) {
+		static std::vector<CgalBody> convert(const std::vector<TaskBody>& bodies) 
+		{
 			std::vector<CgalBody> ans;
 			for (const auto& body : bodies) { ans.push_back(body); }
 			return ans;
