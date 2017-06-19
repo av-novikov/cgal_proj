@@ -33,6 +33,7 @@ namespace mesh
 	enum CellType { INNER, BORDER_IN, BORDER_OUT };
 	struct CellInfo
 	{
+		size_t id;
 		size_t localVertexIndices[3];
 		size_t localNeighborIndices[3];
 		CellType type;
@@ -92,8 +93,8 @@ namespace mesh
 		Triangulation triangulation;
 		std::vector<CellHandle> cellHandles;
 		std::vector<VertexHandle> vertexHandles;
-		std::vector<LocalVertexIndex> borderIndices;
-		std::vector<LocalVertexIndex> innerIndices;
+		//std::vector<LocalVertexIndex> innerIndices;
+
 
 		std::shared_ptr<VTKSnapshotter<FirstModel>> snapshotter;
 
@@ -142,13 +143,12 @@ namespace mesh
 			std::set<VertexHandle> localVertices;
 			for (auto cellIter = triangulation.finite_faces_begin(); cellIter != triangulation.finite_faces_end(); ++cellIter) 
 			{
-				//if (cellIter->info().getGridId() == id) 
-				//{
 					cellHandles.push_back(cellIter);
 					for (int i = 0; i < CELL_POINTS_NUMBER; i++)
 						localVertices.insert(cellIter->vertex(i));
-				//}
 			}
+			for (size_t i = 0; i < cellHandles.size(); i++)
+				cellHandles[i]->info().id = i;
 			vertexHandles.assign(localVertices.begin(), localVertices.end());
 
 			for (size_t i = 0; i < vertexHandles.size(); i++)
@@ -156,8 +156,6 @@ namespace mesh
 			for (CellIterator cell = cellHandles.begin(); cell != cellHandles.end(); ++cell)
 				for (int i = 0; i < CELL_POINTS_NUMBER; i++)
 					(*cell)->info().localVertexIndices[i] = (*cell)->vertex(i)->info();
-
-
 		};
 		void snapshot(const int i) const
 		{

@@ -40,7 +40,7 @@ IntermediateTriangulation Cgal2DMesher::triangulate(const double spatialStep, co
 	Mesher mesher(cdt);
 	mesher.set_criteria(Criteria(0.25, spatialStep));
 	mesher.refine_mesh();
-	CGAL::lloyd_optimize_mesh_2(cdt, CGAL::parameters::max_iteration_number = 10);
+	//CGAL::lloyd_optimize_mesh_2(cdt, CGAL::parameters::max_iteration_number = 10);
 
 	// copy from CDT to IntermediateTriangulation adding info
 	// about containing body to triangulation cells

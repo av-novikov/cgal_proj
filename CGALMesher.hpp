@@ -20,9 +20,9 @@ namespace cgalmesher
 
 	/// The result of meshing to be copied to some resulting triangulation
 	typedef CGAL::Delaunay_triangulation_2<K, Tds> IntermediateTriangulation;
-	typedef IntermediateTriangulation::Point                       CgalPoint2;
-	typedef IntermediateTriangulation::Geom_traits::Vector_2       CgalVector2;
-	typedef CGAL::Polygon_2<K, std::vector<CgalPoint2>>            Polygon;
+	typedef IntermediateTriangulation::Point						CgalPoint2;
+	typedef IntermediateTriangulation::Geom_traits::Vector_2		CgalVector2;
+	typedef CGAL::Polygon_2<K, std::vector<CgalPoint2>>				Polygon;
 	
 	/**
 	* 2D mesher by CGAL library
@@ -41,7 +41,6 @@ namespace cgalmesher
 			std::vector<Border> inner; ///< borders of the inner cavities of the body
 			std::vector<Edge> constraint;
 		};
-
 		/// Body structure used inside the mesher
 		struct CgalBody 
 		{
