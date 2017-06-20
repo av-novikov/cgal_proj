@@ -11,6 +11,8 @@
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/Polygon_2.h>
 
+#include "Element.hpp"
+
 namespace cgalmesher
 {
 	typedef CGAL::Exact_predicates_inexact_constructions_kernel    K;
@@ -135,17 +137,17 @@ namespace cgalmesher
 		template<typename ResultingTriangulation,
 				template<typename, typename> class CellConverter = DefaultCellConverter,
 				template<typename, typename> class VertexConverter = DefaultVertexConverter>
-		static void triangulate(const double spatialStep, const std::vector<TaskBody> bodies, ResultingTriangulation& result) 
+		static void triangulate(const double spatialStep, const std::vector<TaskBody> bodies, ResultingTriangulation& result,
+								std::vector<size_t>& constrainedCells)
 		{
 			copyTriangulation<IntermediateTriangulation, ResultingTriangulation,
-				CellConverter, VertexConverter>(triangulate(spatialStep, convert(bodies)), result);
+				CellConverter, VertexConverter>(triangulate(spatialStep, convert(bodies), constrainedCells), result);
 		}
-
 
 	private:
 		/** The meshing itself */
 		static IntermediateTriangulation triangulate(
-			const double spatialStep, const std::vector<CgalBody> bodies);
+			const double spatialStep, const std::vector<CgalBody> bodies, std::vector<size_t>& constrainedCells);
 
 
 		/**

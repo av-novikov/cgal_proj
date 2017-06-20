@@ -8,16 +8,15 @@
 
 using namespace cgalmesher;
 
-IntermediateTriangulation Cgal2DMesher::triangulate(const double spatialStep, const std::vector<CgalBody> bodies) 
+IntermediateTriangulation Cgal2DMesher::triangulate(const double spatialStep, const std::vector<CgalBody> bodies, std::vector<size_t>& constrainedCells)
 {
-	typedef CGAL::Delaunay_mesh_face_base_2<K>                  Fb;
+	typedef CGAL::Delaunay_mesh_face_base_2<K>				     Fb;
 	typedef CGAL::Triangulation_data_structure_2<Vb, Fb>        Tds;
 	typedef CGAL::Constrained_Delaunay_triangulation_2<K, Tds>  CDT;
 	typedef CGAL::Delaunay_mesh_size_criteria_2<CDT>            Criteria;
 	typedef CGAL::Delaunay_mesher_2<CDT, Criteria>              Mesher;
 
 	CDT cdt;
-
 	// Special "seeds" in the interior of inner cavities
 	// to tell CGAL do not mesh these cavities
 	std::list<CgalPoint2> listOfSeeds;
@@ -36,11 +35,27 @@ IntermediateTriangulation Cgal2DMesher::triangulate(const double spatialStep, co
 			cdt.insert_constraint(con.first, con.second);
 	}
 
-
 	Mesher mesher(cdt);
-	mesher.set_criteria(Criteria(0.25, spatialStep));
+	mesher.set_criteria(Criteria(0.2, spatialStep));
 	mesher.refine_mesh();
 	//CGAL::lloyd_optimize_mesh_2(cdt, CGAL::parameters::max_iteration_number = 10);
+
+	size_t cell_idx = 0;
+	bool isConstrained;
+	for (auto cellIter = cdt.finite_faces_begin(); cellIter != cdt.finite_faces_end(); ++cellIter)
+	{
+		isConstrained = false;
+		for (int i = 0; i < 3; i++)
+		{
+			isConstrained = cellIter->is_constrained(i);
+			if (isConstrained == true)
+			{
+				constrainedCells.push_back(cell_idx);
+				break;
+			}
+		}
+		cell_idx++;
+	}
 
 	// copy from CDT to IntermediateTriangulation adding info
 	// about containing body to triangulation cells

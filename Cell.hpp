@@ -3,26 +3,19 @@
 
 #include "Element.hpp"
 
-namespace cell
-{
-	template <class TElement, typename TVariable>
-	class AbstractCell : public TElement
+	enum CellType { INNER, BORDER1, BORDER2, BORDER3, CONSTRAINED };
+	class TriangleCell
 	{
 	public:
-		typedef TElement Element;
-		typedef typename Element::Point Point;
-		typedef typename Element::Facet Facet;
-		typedef TVariable Variable;
+		size_t id;
+		size_t nebr[3];
+		CellType type;
+		point::Point2d c;
+		double V;
 	public:
-		Variable u_prev, u_iter, u_next;
-		std::array<AbstractCell*, Element::size> nebrs;
+		TriangleCell() {};
+		TriangleCell(size_t _id) : id(_id) {};
+		~TriangleCell() {};
 	};
-
-	template <typename TVariable>
-	class TriangleCell : public AbstractCell<elem::Triangle, TVariable>
-	{
-	public:
-	};
-};
 
 #endif /* CELL_HPP_ */

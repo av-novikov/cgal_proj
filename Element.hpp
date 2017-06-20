@@ -54,13 +54,19 @@ namespace point
 			for (auto value : values)
 				this->coords[i++] = value;
 		};
-
 		AbstractPoint<Container>& operator=(const AbstractPoint<Container>& m)
 		{
 			for (int i = 0; i < dim; i++)
 				this->coords[i] = m.coords[i];
 
 			return *this;
+		};
+		double norm() const 
+		{
+			double sum = 0.0;
+			for (int i = 0; i < dim; i++)
+				sum += this->coords[i] * this->coords[i];
+			return sqrt(sum);
 		};
 	};
 	
@@ -138,6 +144,11 @@ namespace point
 	{
 		return !(m1 == m2);
 	}
+	template<class Container>
+	inline double distance(const AbstractPoint<Container>& p1, const AbstractPoint<Container>& p2)
+	{
+		return (p2 - p1).norm();
+	};
 
 	typedef AbstractPoint<Point2dContainer> Point2d;
 	typedef AbstractPoint<Point3dContainer> Point3d;
@@ -158,7 +169,7 @@ namespace std
 };
 namespace elem
 {
-	enum ELTYPE {EDGE = 2, TRI = 3, TETR = 4, QUAD = 4, HEX = 8};
+	/*enum ELTYPE {EDGE = 2, TRI = 3, TETR = 4, QUAD = 4, HEX = 8};
 
 	template <int N, class TPoint, class TFacet>
 	class Element
@@ -176,9 +187,15 @@ namespace elem
 		double V;
 	};
 
-	template <typename TPoint> using Edge = std::pair<TPoint*, TPoint*>;
 	typedef Element<TRI, point::Point2d, Edge<point::Point2d> > Triangle;
-	typedef Element<TETR, point::Point3d, Triangle> Tetrahedron;
+	typedef Element<TETR, point::Point3d, Triangle> Tetrahedron;*/
+
+	struct Edge
+	{
+		double length;
+		point::Point2d center;
+		size_t nebrInd;
+	};
 };
 
 #endif /* ELEMENT_HPP_ */

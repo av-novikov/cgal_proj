@@ -3,8 +3,10 @@
 
 #include <array>
 #include <set>
+#include <CGAL/Triangle_2.h>
 
 #include "Cell.hpp"
+#include "Element.hpp"
 #include "AbstractMesh.hpp"
 #include "CGALMesher.hpp"
 #include "VTKSnapshotter.hpp"
@@ -28,17 +30,21 @@ struct Task
 	std::vector<Body> bodies;
 };
 
+struct CellInfo
+{
+	size_t id;
+	point::Point2d center;
+	double V;
+	size_t vertexIndices[3];
+	std::vector<size_t> neighborIndices;
+	std::vector<size_t> edgesIndices;		// only for border cells
+	CellType type;
+	bool isConstrained = false;
+};
+typedef size_t VertexInfo;
+
 namespace mesh
 {
-	enum CellType { INNER, BORDER_IN, BORDER_OUT };
-	struct CellInfo
-	{
-		size_t id;
-		size_t localVertexIndices[3];
-		size_t localNeighborIndices[3];
-		CellType type;
-	};
-	typedef size_t VertexInfo;
 	struct Iterator {
 		typedef size_t Index;
 
@@ -69,9 +75,9 @@ namespace mesh
 	};
 
 	template <typename TVariable>
-	class TriangleMesh : public AbstractMesh<cell::TriangleCell<TVariable> >
+	class TriangleMesh
 	{
-	public:
+	public: 
 		typedef CGAL::Exact_predicates_inexact_constructions_kernel        K;
 		typedef CGAL::Triangulation_vertex_base_with_info_2<VertexInfo, K> Vb;
 		typedef CGAL::Triangulation_face_base_with_info_2<CellInfo, K>     Cb;
@@ -91,10 +97,12 @@ namespace mesh
 		static const int CELL_POINTS_NUMBER = 3;
 	public:
 		Triangulation triangulation;
-		std::vector<CellHandle> cellHandles;
 		std::vector<VertexHandle> vertexHandles;
-		//std::vector<LocalVertexIndex> innerIndices;
-
+		std::vector<CellHandle> cellHandles;
+		std::vector<elem::Edge> borderEdges;
+		std::vector<CellHandle*> innerHandles;
+		std::vector<CellHandle*> borderHandles; 
+		std::vector<CellHandle*> constrainedHandles;
 
 		std::shared_ptr<VTKSnapshotter<FirstModel>> snapshotter;
 
@@ -138,24 +146,73 @@ namespace mesh
 			for (const auto& b : task.bodies)
 				bodies.push_back({ b.id, b.outer, b.inner, b.constraint });
 
-			cgalmesher::Cgal2DMesher::triangulate(task.spatialStep, bodies, triangulation);
+			std::vector<size_t> constrainedCells;
+			cgalmesher::Cgal2DMesher::triangulate(task.spatialStep, bodies, triangulation, constrainedCells);
 
 			std::set<VertexHandle> localVertices;
+			size_t i = 0;
 			for (auto cellIter = triangulation.finite_faces_begin(); cellIter != triangulation.finite_faces_end(); ++cellIter) 
 			{
 					cellHandles.push_back(cellIter);
 					for (int i = 0; i < CELL_POINTS_NUMBER; i++)
 						localVertices.insert(cellIter->vertex(i));
+					
+					auto& cell = cellHandles[cellHandles.size() - 1];
+					cell->info().id = i++;
+					const auto& tri = triangulation.triangle(cellIter);
+					cell->info().V = fabs(tri.area());
+					const auto center = CGAL::barycenter(tri.vertex(0), 1.0 / 3.0, tri.vertex(1), 1.0 / 3.0, tri.vertex(2));
+					cell->info().center = { center[0], center[1] };
 			}
-			for (size_t i = 0; i < cellHandles.size(); i++)
-				cellHandles[i]->info().id = i;
 			vertexHandles.assign(localVertices.begin(), localVertices.end());
 
 			for (size_t i = 0; i < vertexHandles.size(); i++)
 				vertexHandles[i]->info() = i;
+
+			int nebrCounter;
+			size_t cellCounter = 0;
+			size_t vecCounter = 0;
 			for (CellIterator cell = cellHandles.begin(); cell != cellHandles.end(); ++cell)
+			{
+				nebrCounter = 0;
 				for (int i = 0; i < CELL_POINTS_NUMBER; i++)
-					(*cell)->info().localVertexIndices[i] = (*cell)->vertex(i)->info();
+				{
+					(*cell)->info().vertexIndices[i] = (*cell)->vertex(i)->info();
+					const auto& nebr = (*cell)->neighbor(i);
+					if (!triangulation.is_infinite(nebr))
+					{
+						(*cell)->info().neighborIndices.push_back(nebr->info().id);
+						nebrCounter++;
+					}
+					else
+					{
+						const Point2d& p1 = { (*cell)->vertex((*cell)->cw(i))->point()[0], (*cell)->vertex((*cell)->cw(i))->point()[1] };
+						const Point2d& p2 = { (*cell)->vertex((*cell)->ccw(i))->point()[0], (*cell)->vertex((*cell)->ccw(i))->point()[1] };
+						borderEdges.push_back({ point::distance(p1, p2), (p1 + p2) / 2.0,  (*cell)->info().id });
+						(*cell)->info().edgesIndices.push_back(borderEdges.size()-1);
+					}
+				}
+				
+				if (vecCounter < constrainedCells.size())
+				{
+					if (constrainedCells[vecCounter] == cellCounter)
+					{
+						vecCounter++;
+						(*cell)->info().type = CellType::CONSTRAINED;
+					}
+				}
+
+				if(nebrCounter == CELL_POINTS_NUMBER && (*cell)->info().type != CellType::CONSTRAINED)
+					(*cell)->info().type = CellType::INNER;
+				else if (nebrCounter == CELL_POINTS_NUMBER - 1)
+					(*cell)->info().type = CellType::BORDER1;
+				else if (nebrCounter == CELL_POINTS_NUMBER - 2)
+					(*cell)->info().type = CellType::BORDER2;
+				else if (nebrCounter == CELL_POINTS_NUMBER - 3)
+					(*cell)->info().type = CellType::BORDER3;
+
+				cellCounter++;
+			}
 		};
 		void snapshot(const int i) const
 		{

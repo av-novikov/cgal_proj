@@ -17,7 +17,7 @@ int main(int argc, char* argv[])
 	task.bodies = {	Task::Body({ 0, body1border, {}})};
 
 	Point pt1 = { 1.0, -1.0 };			Point pt2 = { -1.0, 1.0 };
-	const int SIZE = 200;
+	const int SIZE = 1000;
 	const double dx = (pt2[0] - pt1[0]) / (double)SIZE;
 	const double dy = (pt2[1] - pt1[1]) / (double)SIZE;
 	for (int i = 0; i < SIZE; i++)
