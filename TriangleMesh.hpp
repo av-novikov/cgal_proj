@@ -97,13 +97,11 @@ namespace mesh
 		static const int CELL_POINTS_NUMBER = 3;
 	public:
 		Triangulation triangulation;
-		std::vector<VertexHandle> vertexHandles;
-		std::vector<CellHandle> cellHandles;
-		std::vector<elem::Edge> borderEdges;
-		std::vector<CellHandle*> innerHandles;
-		std::vector<CellHandle*> borderHandles; 
-		std::vector<CellHandle*> constrainedHandles;
 
+		int inner_cells = 0;
+		int border_edges = 0;
+		std::vector<TriangleCell> cells;
+		std::vector<VertexHandle> vertexHandles;
 		std::shared_ptr<VTKSnapshotter<FirstModel>> snapshotter;
 
 		/*std::list<CellHandle> localIncidentCells(const LocalVertexIndex it) const {
@@ -150,19 +148,18 @@ namespace mesh
 			cgalmesher::Cgal2DMesher::triangulate(task.spatialStep, bodies, triangulation, constrainedCells);
 
 			std::set<VertexHandle> localVertices;
-			size_t i = 0;
+			size_t cell_idx = 0;
 			for (auto cellIter = triangulation.finite_faces_begin(); cellIter != triangulation.finite_faces_end(); ++cellIter) 
 			{
-					cellHandles.push_back(cellIter);
-					for (int i = 0; i < CELL_POINTS_NUMBER; i++)
-						localVertices.insert(cellIter->vertex(i));
-					
-					auto& cell = cellHandles[cellHandles.size() - 1];
-					cell->info().id = i++;
-					const auto& tri = triangulation.triangle(cellIter);
-					cell->info().V = fabs(tri.area());
-					const auto center = CGAL::barycenter(tri.vertex(0), 1.0 / 3.0, tri.vertex(1), 1.0 / 3.0, tri.vertex(2));
-					cell->info().center = { center[0], center[1] };
+				cells.push_back(TriangleCell(cell_idx++));
+				for (int i = 0; i < CELL_POINTS_NUMBER; i++)
+					localVertices.insert( cellIter->vertex(i) );
+				
+				auto& cell = cells[cells.size() - 1];
+				const auto& tri = triangulation.triangle(cellIter);
+				cell.V = fabs(tri.area());
+				const auto center = CGAL::barycenter(tri.vertex(0), 1.0 / 3.0, tri.vertex(1), 1.0 / 3.0, tri.vertex(2));
+				cell.c = { center[0], center[1] };
 			}
 			vertexHandles.assign(localVertices.begin(), localVertices.end());
 
@@ -170,48 +167,54 @@ namespace mesh
 				vertexHandles[i]->info() = i;
 
 			int nebrCounter;
-			size_t cellCounter = 0;
 			size_t vecCounter = 0;
-			for (CellIterator cell = cellHandles.begin(); cell != cellHandles.end(); ++cell)
+			auto cellIter = triangulation.finite_faces_begin();
+			inner_cells = cells.size();
+			cells.reserve(int(1.5  * inner_cells));
+			for (int cell_idx = 0; cell_idx < inner_cells; cell_idx++)
 			{
+				TriangleCell& cell = cells[cell_idx];
 				nebrCounter = 0;
 				for (int i = 0; i < CELL_POINTS_NUMBER; i++)
 				{
-					(*cell)->info().vertexIndices[i] = (*cell)->vertex(i)->info();
-					const auto& nebr = (*cell)->neighbor(i);
+					cell.points[i] = cellIter->vertex(i)->info();
+					const auto& nebr = cellIter->neighbor(i);
 					if (!triangulation.is_infinite(nebr))
 					{
-						(*cell)->info().neighborIndices.push_back(nebr->info().id);
+						cell.nebr[i] = nebr->info().id;
 						nebrCounter++;
 					}
 					else
 					{
-						const Point2d& p1 = { (*cell)->vertex((*cell)->cw(i))->point()[0], (*cell)->vertex((*cell)->cw(i))->point()[1] };
-						const Point2d& p2 = { (*cell)->vertex((*cell)->ccw(i))->point()[0], (*cell)->vertex((*cell)->ccw(i))->point()[1] };
-						borderEdges.push_back({ point::distance(p1, p2), (p1 + p2) / 2.0,  (*cell)->info().id });
-						(*cell)->info().edgesIndices.push_back(borderEdges.size()-1);
+						const Point2d& p1 = { cellIter->vertex(cellIter->cw(i))->point()[0], cellIter->vertex(cellIter->cw(i))->point()[1] };
+						const Point2d& p2 = { cellIter->vertex(cellIter->ccw(i))->point()[0], cellIter->vertex(cellIter->ccw(i))->point()[1] };
+						cells.push_back(TriangleCell(inner_cells + border_edges));
+						TriangleCell& edge = cells[cells.size() - 1];
+						edge.type = CellType::BORDER;
+						edge.c = (p1 + p2) / 2.0;
+						edge.V = point::distance(p1, p2);
+						edge.nebr[0] = cell_idx;
+						edge.points[0] = cellIter->vertex(cellIter->cw(i))->info();
+						edge.points[1] = cellIter->vertex(cellIter->ccw(i))->info();
+						cell.nebr[i] = inner_cells + border_edges;
+						border_edges++;
 					}
 				}
-				
 				if (vecCounter < constrainedCells.size())
 				{
-					if (constrainedCells[vecCounter] == cellCounter)
+					if (constrainedCells[vecCounter] == cell_idx)
 					{
 						vecCounter++;
-						(*cell)->info().type = CellType::CONSTRAINED;
+						cell.type = CellType::CONSTRAINED;
 					}
 				}
 
-				if(nebrCounter == CELL_POINTS_NUMBER && (*cell)->info().type != CellType::CONSTRAINED)
-					(*cell)->info().type = CellType::INNER;
-				else if (nebrCounter == CELL_POINTS_NUMBER - 1)
-					(*cell)->info().type = CellType::BORDER1;
-				else if (nebrCounter == CELL_POINTS_NUMBER - 2)
-					(*cell)->info().type = CellType::BORDER2;
-				else if (nebrCounter == CELL_POINTS_NUMBER - 3)
-					(*cell)->info().type = CellType::BORDER3;
+				if (nebrCounter == CELL_POINTS_NUMBER && cell.type != CellType::CONSTRAINED)
+					cell.type = CellType::INNER;
+				else if (nebrCounter < CELL_POINTS_NUMBER)
+					cell.type = CellType::BORDER;
 
-				cellCounter++;
+				++cellIter;
 			}
 		};
 		void snapshot(const int i) const

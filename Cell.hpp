@@ -3,12 +3,13 @@
 
 #include "Element.hpp"
 
-	enum CellType { INNER, BORDER1, BORDER2, BORDER3, CONSTRAINED };
+	enum CellType { INNER, CONSTRAINED, BORDER };
 	class TriangleCell
 	{
 	public:
 		size_t id;
 		size_t nebr[3];
+		size_t points[3];
 		CellType type;
 		point::Point2d c;
 		double V;

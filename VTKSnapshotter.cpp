@@ -68,16 +68,17 @@ void VTKSnapshotter<FirstModel>::dump(const int i)
 		const auto& pt = vhandle->point();
 		points->InsertNextPoint(pt[0], pt[1], 0.0);
 	}
-	for (const auto& cell : mesh->cellHandles) 
+	for (int i = 0; i < mesh->inner_cells; i++) 
 	{
+		const TriangleCell& cell = mesh->cells[i];
 		auto vtkCell = vtkSmartPointer<vtkTriangle>::New();
 
 		for (int i = 0; i < Mesh::CELL_POINTS_NUMBER; i++) 
-			vtkCell->GetPointIds()->SetId(i, cell->info().vertexIndices[i]);
+			vtkCell->GetPointIds()->SetId(i, cell.points[i]);
 
 		facets->InsertNextCell(vtkCell);
-		type->InsertNextValue(cell->info().type);
-		vol->InsertNextValue(cell->info().V);
+		type->InsertNextValue(cell.type);
+		vol->InsertNextValue(cell.V);
 	}
 
 	grid->SetPoints(points);

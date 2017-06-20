@@ -41,6 +41,8 @@ namespace point
 	class AbstractPoint : public Container
 	{
 	public:
+		size_t id;
+	public:
 		static const int dim = Container::dim;
 
 		AbstractPoint() {};
