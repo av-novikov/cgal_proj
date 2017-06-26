@@ -10,15 +10,13 @@
 #include <vtkTriangle.h>
 #include <vtkTetra.h>
 
-#include "VTKSnapshotter.hpp"
-
-#include "Model.hpp"
+#include "src/snapshotter/VTKSnapshotter.hpp"
+#include "src/models/Model.hpp"
 
 using std::vector;
 
-template <class modelType>
+template<class modelType>
 const std::string VTKSnapshotter<modelType>::prefix = "";
-
 template<class modelType>
 VTKSnapshotter<modelType>::VTKSnapshotter(const Mesh* _mesh) : mesh(_mesh)
 {

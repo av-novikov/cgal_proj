@@ -4,7 +4,7 @@
 #include <CGAL/Delaunay_mesher_2.h>
 
 #include <CGAL/lloyd_optimize_mesh_2.h>
-#include "CGALMesher.hpp"
+#include "src/mesh/CGALMesher.hpp"
 
 using namespace cgalmesher;
 

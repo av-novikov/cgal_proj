@@ -2,15 +2,15 @@
 #define TRIANGLEMESH_HPP_
 
 #include <array>
+#include <valarray>
 #include <set>
+#include <utility>
 #include <CGAL/Triangle_2.h>
 
-#include "Cell.hpp"
-#include "Element.hpp"
-#include "AbstractMesh.hpp"
-#include "CGALMesher.hpp"
-#include "VTKSnapshotter.hpp"
-#include <utility>
+#include "src/models/Cell.hpp"
+#include "src/models/Element.hpp"
+#include "src/mesh/CGALMesher.hpp"
+#include "src/snapshotter/VTKSnapshotter.hpp"
 
 class FirstModel;
 
@@ -29,7 +29,6 @@ struct Task
 	};
 	std::vector<Body> bodies;
 };
-
 struct CellInfo
 {
 	size_t id;
@@ -77,6 +76,7 @@ namespace mesh
 	template <typename TVariable>
 	class TriangleMesh
 	{
+		template<typename> friend class VTKSnapshotter;
 	public: 
 		typedef CGAL::Exact_predicates_inexact_constructions_kernel        K;
 		typedef CGAL::Triangulation_vertex_base_with_info_2<VertexInfo, K> Vb;
@@ -93,44 +93,50 @@ namespace mesh
 		typedef Iterator::Index LocalVertexIndex;
 		typedef std::vector<CellHandle>::const_iterator CellIterator;
 
+		typedef TVariable Variable;
+		typedef typename Variable::DataVector DataVector;
+
 		static const int CELL_POINTS_NUMBER = 3;	
-	public:
+	protected:
 		Triangulation triangulation;
-		int inner_cells = 0, inner_beg;
-		int border_edges = 0, border_beg;
-		int constrained_edges = 0, constrained_beg;
+		size_t inner_cells = 0, inner_beg;
+		size_t border_edges = 0, border_beg;
+		size_t constrained_edges = 0, constrained_beg;
 		std::vector<TriangleCell> cells;
 		std::vector<VertexHandle> vertexHandles;
 		std::shared_ptr<VTKSnapshotter<FirstModel>> snapshotter;
-	public:
-		TriangleMesh() {};
-		TriangleMesh(const Task& task) 
-		{
-			load(task);
-			snapshotter = std::make_shared<VTKSnapshotter<FirstModel>>(this);
-		};
-		~TriangleMesh() {};
 
+		DataVector u_prev, u_iter, u_next;
+
+		void allocateMemory() 
+		{
+			u_prev.resize(Variable::size * cells.size());
+			u_iter.resize(Variable::size * cells.size());
+			u_next.resize(Variable::size * cells.size());
+		};
 		void load(const Task& task)
 		{
+			// Task reading
 			typedef cgalmesher::Cgal2DMesher::TaskBody Body;
 			std::vector<Body> bodies;
 			for (const auto& b : task.bodies)
 				bodies.push_back({ b.id, b.outer, b.inner, b.constraint });
 
+			// Triangulation sends addtional info about constraints
 			std::vector<std::pair<size_t, int>> constrainedCells;
 			cgalmesher::Cgal2DMesher::triangulate(task.spatialStep, bodies, triangulation, constrainedCells);
 
+			// Cells / Vertices addition
 			std::set<VertexHandle> localVertices;
 			size_t cell_idx = 0;
 			inner_beg = 0;
-			for (auto cellIter = triangulation.finite_faces_begin(); cellIter != triangulation.finite_faces_end(); ++cellIter) 
+			for (auto cellIter = triangulation.finite_faces_begin(); cellIter != triangulation.finite_faces_end(); ++cellIter)
 			{
 				cellIter->info().id = cell_idx;
 				cells.push_back(TriangleCell(cell_idx++));
 				for (int i = 0; i < CELL_POINTS_NUMBER; i++)
-					localVertices.insert( cellIter->vertex(i) );
-				
+					localVertices.insert(cellIter->vertex(i));
+
 				auto& cell = cells[cells.size() - 1];
 				cell.type = CellType::INNER;
 				const auto& tri = triangulation.triangle(cellIter);
@@ -140,12 +146,12 @@ namespace mesh
 			}
 			inner_cells = cells.size();
 
+			// Coping vertices from set to vector
 			vertexHandles.assign(localVertices.begin(), localVertices.end());
 			for (size_t i = 0; i < vertexHandles.size(); i++)
 				vertexHandles[i]->info() = i;
 
-			//setConstrainedEdges(constrainedEdges);
-
+			// Border / Constrained cells treatment
 			int nebrCounter;
 			size_t vecCounter = 0;
 			auto cellIter = triangulation.finite_faces_begin();
@@ -197,6 +203,7 @@ namespace mesh
 				++cellIter;
 			}
 
+			// Creating constrained cells
 			constrained_beg = cells.size();
 			cellIter = triangulation.finite_faces_begin();
 			for (int cell_idx = 0; cell_idx < inner_cells; cell_idx++)
@@ -220,7 +227,7 @@ namespace mesh
 					edge.nebr[0] = cell_idx;		edge.nebr[1] = nebr.id;
 					edge.points[0] = cellIter->vertex(cellIter->cw(nebr_idx))->info();
 					edge.points[1] = cellIter->vertex(cellIter->ccw(nebr_idx))->info();
-					
+
 					cell.nebr[nebr_idx] = constrained_beg + constrained_edges;
 					for (int i = 0; i < CELL_POINTS_NUMBER; i++)
 						if (nebr.nebr[i] == cell.id)
@@ -232,10 +239,19 @@ namespace mesh
 				++cellIter;
 			}
 		};
+	public:
+		TriangleMesh() {};
+		TriangleMesh(const Task& task)
+		{
+			load(task);
+			snapshotter = std::make_shared<VTKSnapshotter<FirstModel>>(this);
+		};
+		~TriangleMesh() {};
+
 		void snapshot(const int i) const
 		{
 			snapshotter->dump(i);
-		}
+		};
 	};
 };
 

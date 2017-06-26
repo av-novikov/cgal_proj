@@ -11,7 +11,7 @@
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/Polygon_2.h>
 
-#include "Element.hpp"
+#include "src/models/Element.hpp"
 
 namespace cgalmesher
 {

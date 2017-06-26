@@ -1,7 +1,7 @@
 #ifndef CELL_HPP_
 #define CELL_HPP_
 
-#include "Element.hpp"
+#include "src/models/Element.hpp"
 
 	enum CellType { INNER, CONSTRAINED, BORDER };
 	class TriangleCell

@@ -1,6 +1,6 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
-#include "Model.hpp"
+#include "src/models/Model.hpp"
 
 using namespace std;
 using namespace point;
