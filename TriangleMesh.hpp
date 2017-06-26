@@ -82,7 +82,6 @@ namespace mesh
 		typedef CGAL::Triangulation_vertex_base_with_info_2<VertexInfo, K> Vb;
 		typedef CGAL::Triangulation_face_base_with_info_2<CellInfo, K>     Cb;
 		typedef CGAL::Triangulation_data_structure_2<Vb, Cb>               Tds;
-		/// The triangulation type
 		typedef CGAL::Delaunay_triangulation_2<K, Tds>                     Triangulation;
 
 		typedef Triangulation::Vertex_handle           VertexHandle;
@@ -94,40 +93,15 @@ namespace mesh
 		typedef Iterator::Index LocalVertexIndex;
 		typedef std::vector<CellHandle>::const_iterator CellIterator;
 
-		static const int CELL_POINTS_NUMBER = 3;
+		static const int CELL_POINTS_NUMBER = 3;	
 	public:
 		Triangulation triangulation;
-
-		int inner_cells = 0;
-		int border_edges = 0;
+		int inner_cells = 0, inner_beg;
+		int border_edges = 0, border_beg;
+		int constrained_edges = 0, constrained_beg;
 		std::vector<TriangleCell> cells;
 		std::vector<VertexHandle> vertexHandles;
 		std::shared_ptr<VTKSnapshotter<FirstModel>> snapshotter;
-
-		/*std::list<CellHandle> localIncidentCells(const LocalVertexIndex it) const {
-			VertexHandle vh = vertexHandle(it);
-			std::list<CellHandle> ans = triangulation->allIncidentCells(vh);
-			auto listIter = ans.begin();
-			while (listIter != ans.end()) {
-				if (belongsToTheGrid(*listIter)) {
-					++listIter;
-				}
-				else {
-					listIter = ans.erase(listIter);
-				}
-			}
-			return ans;
-		}*/
-		/*CellType cellState(const LocalVertexIndex it) const 
-		{
-			std::set<GridId> incidentGrids = gridsAroundVertex(it);
-			assert_true(incidentGrids.erase(id));
-			if (incidentGrids.empty()) { return BorderState::INNER; }
-			if (incidentGrids.size() > 1) { return BorderState::MULTICONTACT; }
-			if (*incidentGrids.begin() == EmptySpaceFlag) { return BorderState::BORDER; }
-			return BorderState::CONTACT;
-		}*/
-
 	public:
 		TriangleMesh() {};
 		TriangleMesh(const Task& task) 
@@ -144,33 +118,39 @@ namespace mesh
 			for (const auto& b : task.bodies)
 				bodies.push_back({ b.id, b.outer, b.inner, b.constraint });
 
-			std::vector<size_t> constrainedCells;
+			std::vector<std::pair<size_t, int>> constrainedCells;
 			cgalmesher::Cgal2DMesher::triangulate(task.spatialStep, bodies, triangulation, constrainedCells);
 
 			std::set<VertexHandle> localVertices;
 			size_t cell_idx = 0;
+			inner_beg = 0;
 			for (auto cellIter = triangulation.finite_faces_begin(); cellIter != triangulation.finite_faces_end(); ++cellIter) 
 			{
+				cellIter->info().id = cell_idx;
 				cells.push_back(TriangleCell(cell_idx++));
 				for (int i = 0; i < CELL_POINTS_NUMBER; i++)
 					localVertices.insert( cellIter->vertex(i) );
 				
 				auto& cell = cells[cells.size() - 1];
+				cell.type = CellType::INNER;
 				const auto& tri = triangulation.triangle(cellIter);
 				cell.V = fabs(tri.area());
 				const auto center = CGAL::barycenter(tri.vertex(0), 1.0 / 3.0, tri.vertex(1), 1.0 / 3.0, tri.vertex(2));
 				cell.c = { center[0], center[1] };
 			}
-			vertexHandles.assign(localVertices.begin(), localVertices.end());
+			inner_cells = cells.size();
 
+			vertexHandles.assign(localVertices.begin(), localVertices.end());
 			for (size_t i = 0; i < vertexHandles.size(); i++)
 				vertexHandles[i]->info() = i;
+
+			//setConstrainedEdges(constrainedEdges);
 
 			int nebrCounter;
 			size_t vecCounter = 0;
 			auto cellIter = triangulation.finite_faces_begin();
-			inner_cells = cells.size();
 			cells.reserve(int(1.5  * inner_cells));
+			border_beg = cells.size();
 			for (int cell_idx = 0; cell_idx < inner_cells; cell_idx++)
 			{
 				TriangleCell& cell = cells[cell_idx];
@@ -202,7 +182,7 @@ namespace mesh
 				}
 				if (vecCounter < constrainedCells.size())
 				{
-					if (constrainedCells[vecCounter] == cell_idx)
+					if (constrainedCells[vecCounter].first == cell_idx)
 					{
 						vecCounter++;
 						cell.type = CellType::CONSTRAINED;
@@ -212,7 +192,42 @@ namespace mesh
 				if (nebrCounter == CELL_POINTS_NUMBER && cell.type != CellType::CONSTRAINED)
 					cell.type = CellType::INNER;
 				else if (nebrCounter < CELL_POINTS_NUMBER)
-					cell.type = CellType::BORDER;
+					cell.type = CellType::INNER;
+
+				++cellIter;
+			}
+
+			constrained_beg = cells.size();
+			cellIter = triangulation.finite_faces_begin();
+			for (int cell_idx = 0; cell_idx < inner_cells; cell_idx++)
+			{
+				auto& cell = cells[cell_idx];
+				if (cell.type == CellType::CONSTRAINED)
+				{
+					const int nebr_idx = constrainedCells[constrained_edges].second;
+					const auto nebrIter = cellIter->neighbor(nebr_idx);
+					const int nebr_id = nebrIter->info().id;
+					auto& nebr = cells[nebrIter->info().id];
+					cell.type = nebr.type = CellType::INNER;
+
+					cells.push_back(TriangleCell(constrained_beg + constrained_edges));
+					TriangleCell& edge = cells[cells.size() - 1];
+					edge.type = CellType::CONSTRAINED;
+					const Point2d& p1 = { cellIter->vertex(cellIter->cw(nebr_idx))->point()[0], cellIter->vertex(cellIter->cw(nebr_idx))->point()[1] };
+					const Point2d& p2 = { cellIter->vertex(cellIter->ccw(nebr_idx))->point()[0], cellIter->vertex(cellIter->ccw(nebr_idx))->point()[1] };
+					edge.c = (p1 + p2) / 2.0;
+					edge.V = point::distance(p1, p2);
+					edge.nebr[0] = cell_idx;		edge.nebr[1] = nebr.id;
+					edge.points[0] = cellIter->vertex(cellIter->cw(nebr_idx))->info();
+					edge.points[1] = cellIter->vertex(cellIter->ccw(nebr_idx))->info();
+					
+					cell.nebr[nebr_idx] = constrained_beg + constrained_edges;
+					for (int i = 0; i < CELL_POINTS_NUMBER; i++)
+						if (nebr.nebr[i] == cell.id)
+							nebr.nebr[i] = cell.nebr[nebr_idx];
+
+					constrained_edges++;
+				}
 
 				++cellIter;
 			}

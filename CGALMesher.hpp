@@ -138,7 +138,7 @@ namespace cgalmesher
 				template<typename, typename> class CellConverter = DefaultCellConverter,
 				template<typename, typename> class VertexConverter = DefaultVertexConverter>
 		static void triangulate(const double spatialStep, const std::vector<TaskBody> bodies, ResultingTriangulation& result,
-								std::vector<size_t>& constrainedCells)
+								std::vector<std::pair<size_t, int>>& constrainedCells)
 		{
 			copyTriangulation<IntermediateTriangulation, ResultingTriangulation,
 				CellConverter, VertexConverter>(triangulate(spatialStep, convert(bodies), constrainedCells), result);
@@ -147,7 +147,7 @@ namespace cgalmesher
 	private:
 		/** The meshing itself */
 		static IntermediateTriangulation triangulate(
-			const double spatialStep, const std::vector<CgalBody> bodies, std::vector<size_t>& constrainedCells);
+			const double spatialStep, const std::vector<CgalBody> bodies, std::vector<std::pair<size_t, int>>& constrainedCells);
 
 
 		/**
@@ -168,7 +168,6 @@ namespace cgalmesher
 			copyTriangulation(input, output, cellConverter, vertexConverter);
 		}
 
-
 		/**
 		* Copy CGAL triangulations of different types
 		*/
@@ -180,7 +179,6 @@ namespace cgalmesher
 			output.set_infinite_vertex(output.tds().copy_tds(
 				input.tds(), input.infinite_vertex(), vertexConverter, cellConverter));
 		}
-
 
 		/// @name help functions for mesher
 		/// @{
