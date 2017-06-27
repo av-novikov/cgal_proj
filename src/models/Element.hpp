@@ -169,35 +169,5 @@ namespace std
 		return os;
 	}
 };
-namespace elem
-{
-	/*enum ELTYPE {EDGE = 2, TRI = 3, TETR = 4, QUAD = 4, HEX = 8};
-
-	template <int N, class TPoint, class TFacet>
-	class Element
-	{
-	public:
-		typedef TPoint Point;
-		typedef TFacet Facet;
-	public:
-		static const int size = N;
-	public:
-		Point c;
-		std::array<Point*, N> pts;
-		std::array<Facet*, N> fts;
-
-		double V;
-	};
-
-	typedef Element<TRI, point::Point2d, Edge<point::Point2d> > Triangle;
-	typedef Element<TETR, point::Point3d, Triangle> Tetrahedron;*/
-
-	struct Edge
-	{
-		double length;
-		point::Point2d center;
-		size_t nebrInd;
-	};
-};
 
 #endif /* ELEMENT_HPP_ */

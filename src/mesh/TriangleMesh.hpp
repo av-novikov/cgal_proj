@@ -7,6 +7,7 @@
 #include <utility>
 #include <CGAL/Triangle_2.h>
 
+#include "src/models/Variables.hpp"
 #include "src/models/Cell.hpp"
 #include "src/models/Element.hpp"
 #include "src/mesh/CGALMesher.hpp"
@@ -93,8 +94,8 @@ namespace mesh
 		typedef Iterator::Index LocalVertexIndex;
 		typedef std::vector<CellHandle>::const_iterator CellIterator;
 
-		typedef TVariable Variable;
-		typedef typename Variable::DataVector DataVector;
+		typedef TVariable VarContainer;
+		typedef var::BasicVariables<VarContainer> DataVector;
 
 		static const int CELL_POINTS_NUMBER = 3;	
 	protected:
@@ -106,13 +107,13 @@ namespace mesh
 		std::vector<VertexHandle> vertexHandles;
 		std::shared_ptr<VTKSnapshotter<FirstModel>> snapshotter;
 
-		DataVector u_prev, u_iter, u_next;
+		DataVector data;
 
 		void allocateMemory() 
 		{
-			u_prev.resize(Variable::size * cells.size());
-			u_iter.resize(Variable::size * cells.size());
-			u_next.resize(Variable::size * cells.size());
+			data.u_prev.resize(Variable::size * cells.size());
+			data.u_iter.resize(Variable::size * cells.size());
+			data.u_next.resize(Variable::size * cells.size());
 		};
 		void load(const Task& task)
 		{

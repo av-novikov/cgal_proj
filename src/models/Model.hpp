@@ -9,7 +9,7 @@
 class FirstModel
 {
 public:
-	typedef var::Var1phase Variable;
+	typedef var::containers::Var1phase Variable;
 	typedef mesh::TriangleMesh<Variable> Mesh;
 	std::shared_ptr<Mesh> mesh;
 };
