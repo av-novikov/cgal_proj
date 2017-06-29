@@ -6,6 +6,7 @@
 #include <set>
 #include <utility>
 #include <CGAL/Triangle_2.h>
+#include <CGAL/Polygon_2.h>
 
 #include "src/models/Variables.hpp"
 #include "src/models/Cell.hpp"
@@ -33,13 +34,6 @@ struct Task
 struct CellInfo
 {
 	size_t id;
-	point::Point2d center;
-	double V;
-	size_t vertexIndices[3];
-	std::vector<size_t> neighborIndices;
-	std::vector<size_t> edgesIndices;		// only for border cells
-	CellType type;
-	bool isConstrained = false;
 };
 typedef size_t VertexInfo;
 
@@ -55,19 +49,15 @@ namespace mesh
 		operator Index() const { return iter; }
 
 		const Iterator& operator*() const { return *this; }
-
 		bool operator==(const Iterator& other) const {
 			return iter == other.iter;
 		}
-
 		bool operator!=(const Iterator& other) const {
 			return !((*this) == other);
 		}
-
 		bool operator<(const Iterator& other) const {
 			return iter < other.iter;
 		}
-
 		Iterator& operator++() {
 			iter++;
 			return (*this);
@@ -94,8 +84,7 @@ namespace mesh
 		typedef Iterator::Index LocalVertexIndex;
 		typedef std::vector<CellHandle>::const_iterator CellIterator;
 
-		typedef TVariable VarContainer;
-		typedef var::BasicVariables<VarContainer> DataVector;
+		typedef TriangleCell Cell;
 
 		static const int CELL_POINTS_NUMBER = 3;	
 	protected:
@@ -105,16 +94,8 @@ namespace mesh
 		size_t constrained_edges = 0, constrained_beg;
 		std::vector<TriangleCell> cells;
 		std::vector<VertexHandle> vertexHandles;
-		std::shared_ptr<VTKSnapshotter<FirstModel>> snapshotter;
+		std::vector<TriangleCell*> fracCells;
 
-		DataVector data;
-
-		void allocateMemory() 
-		{
-			data.u_prev.resize(Variable::size * cells.size());
-			data.u_iter.resize(Variable::size * cells.size());
-			data.u_next.resize(Variable::size * cells.size());
-		};
 		void load(const Task& task)
 		{
 			// Task reading
@@ -124,7 +105,7 @@ namespace mesh
 				bodies.push_back({ b.id, b.outer, b.inner, b.constraint });
 
 			// Triangulation sends addtional info about constraints
-			std::vector<std::pair<size_t, int>> constrainedCells;
+			std::vector<size_t> constrainedCells;
 			cgalmesher::Cgal2DMesher::triangulate(task.spatialStep, bodies, triangulation, constrainedCells);
 
 			// Cells / Vertices addition
@@ -173,8 +154,8 @@ namespace mesh
 					}
 					else
 					{
-						const Point2d& p1 = { cellIter->vertex(cellIter->cw(i))->point()[0], cellIter->vertex(cellIter->cw(i))->point()[1] };
-						const Point2d& p2 = { cellIter->vertex(cellIter->ccw(i))->point()[0], cellIter->vertex(cellIter->ccw(i))->point()[1] };
+						const point::Point2d& p1 = { cellIter->vertex(cellIter->cw(i))->point()[0], cellIter->vertex(cellIter->cw(i))->point()[1] };
+						const point::Point2d& p2 = { cellIter->vertex(cellIter->ccw(i))->point()[0], cellIter->vertex(cellIter->ccw(i))->point()[1] };
 						cells.push_back(TriangleCell(inner_cells + border_edges));
 						TriangleCell& edge = cells[cells.size() - 1];
 						edge.type = CellType::BORDER;
@@ -187,25 +168,51 @@ namespace mesh
 						border_edges++;
 					}
 				}
-				if (vecCounter < constrainedCells.size())
+				/*if (vecCounter < constrainedCells.size())
 				{
-					if (constrainedCells[vecCounter].first == cell_idx)
+					if (constrainedCells[vecCounter] == cell_idx)
 					{
 						vecCounter++;
 						cell.type = CellType::CONSTRAINED;
 					}
 				}
-
-				if (nebrCounter == CELL_POINTS_NUMBER && cell.type != CellType::CONSTRAINED)
+				if (nebrCounter == CELL_POINTS_NUMBER)
 					cell.type = CellType::INNER;
 				else if (nebrCounter < CELL_POINTS_NUMBER)
-					cell.type = CellType::INNER;
+					cell.type = CellType::INNER;*/
 
 				++cellIter;
 			}
 
+			// Setting type to fracture cells
+			typedef Triangulation::Point CgalPoint2;
+			typedef CGAL::Polygon_2<K, std::vector<CgalPoint2>>	Polygon;
+			Polygon frac;
+			for (const auto& con : task.bodies[0].constraint)
+				frac.push_back(CgalPoint2(con.first[0], con.first[1]));
+			cell_idx = 0;
+			point::Point2d well_pos = { 0.0, 0.0 };
+			for (auto cellIter = triangulation.finite_faces_begin(); cellIter != triangulation.finite_faces_end(); ++cellIter)
+			{
+				auto& cell = cells[cell_idx];
+				CgalPoint2 center(cell.c.x, cell.c.y);
+				if (!frac.has_on_unbounded_side(center))
+				{
+					cell.type = CellType::FRAC;
+					fracCells.push_back(&cell);
+					well_pos.x += center[0];		well_pos.y += center[1];
+				}
+
+				cell_idx++;
+			}
+			well_pos.x /= fracCells.size();		well_pos.y /= fracCells.size();
+
+			std::vector<CellHandle> well_faces;
+			std::back_insert_iterator<std::vector<CellHandle>> it(well_faces);
+			it = triangulation.get_conflicts(CgalPoint2(well_pos.x, well_pos.y), std::back_inserter(well_faces));
+			cells[well_faces[0]->info().id].type = CellType::WELL;
 			// Creating constrained cells
-			constrained_beg = cells.size();
+/*			constrained_beg = cells.size();
 			cellIter = triangulation.finite_faces_begin();
 			for (int cell_idx = 0; cell_idx < inner_cells; cell_idx++)
 			{
@@ -238,21 +245,20 @@ namespace mesh
 				}
 
 				++cellIter;
-			}
+			}*/
 		};
 	public:
 		TriangleMesh() {};
 		TriangleMesh(const Task& task)
 		{
 			load(task);
-			snapshotter = std::make_shared<VTKSnapshotter<FirstModel>>(this);
 		};
 		~TriangleMesh() {};
 
-		void snapshot(const int i) const
+		int getCellsSize() const
 		{
-			snapshotter->dump(i);
-		};
+			return cells.size();
+		}
 	};
 };
 

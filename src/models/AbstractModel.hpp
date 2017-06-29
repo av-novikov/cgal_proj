@@ -10,15 +10,18 @@
 #include "src/mesh/TriangleMesh.hpp"
 //#include "util/utils.h"
 
-template <typename TVarContainer, typename propsType, template <typename TVarContainer> class TVariables>
-class AbstractModel : public TVariables
+template <typename TVarContainer, typename propsType, template <typename TVarContainer> class TVariables, class modelType>
+class AbstractModel : public TVariables<TVarContainer>
 {	
 public:
 	typedef TVarContainer VarContainer;
-	typedef TVariables Variables;
+	typedef TVariables<TVarContainer> Variables;
 	typedef mesh::TriangleMesh<VarContainer> Mesh;
+	typedef typename Mesh::Cell Cell;
+	typedef propsType Properties;
 protected:
 	std::shared_ptr<Mesh> mesh;
+	std::shared_ptr<VTKSnapshotter<modelType>> snapshotter;
 
 	// Spacial properties
 	double length_perf;
@@ -26,6 +29,7 @@ protected:
 	double r_e;
 	double Volume;
 	int cellsNum;
+	int varNum;
 		
 	// Rate of the well
 	double Q_sum;
@@ -57,8 +61,14 @@ protected:
 	// During the time flow rate decreases 'e' times in well test [sec] 
 	double alpha;
 	double wellboreDuration;
+	int skeletonsNum;
 
-	virtual void loadMesh() = 0;
+	virtual void loadMesh(const Task& task)
+	{
+		mesh = std::make_shared<Mesh>(task);
+		cellsNum = mesh.get()->getCellsSize();
+		varNum = VarContainer::size * cellsNum;
+	}
 	virtual void setProps(propsType& props) = 0;
 	virtual void makeDimLess() = 0;
 	virtual void setPerforated() = 0;
@@ -66,7 +76,10 @@ protected:
 
 	static const int var_size;
 public:
-	AbstractModel() { isWriteSnaps = true;	grav = 9.8; };
+	AbstractModel() 
+	{ 
+		grav = 9.8;
+	};
 	virtual ~AbstractModel() {};
 	
 	// Dimensions
@@ -77,20 +90,30 @@ public:
 	double T_dim;
 	double Q_dim;
 	double grav;
-
-	void load(propsType& props)
+	void load(const Task& task, Properties& props)
 	{
 		setProps(props);
+		loadMesh(task);
 
-		loadMesh();
+		u_prev.resize(varNum);
+		u_iter.resize(varNum);
+		u_next.resize(varNum);
+
 		setPerforated();
 		setInitialState();
 	};
-	virtual void setPeriod(int period) = 0;
+	virtual void setPeriod(const int period) = 0;
 	virtual void setWellborePeriod(int period, double cur_t) {};
 	int getCellsNum() {	return cellsNum; };
-
-	void snapshot_all(int i) { snapshotter->dump_all(i); }
+	void snapshot_all(const int i) { snapshotter->dump(i); }
+	const Mesh* getMesh() const
+	{
+		return mesh.get();
+	}
+	void setSnapshotter(const modelType* model)
+	{
+		snapshotter = std::make_shared<VTKSnapshotter<modelType>>(model);
+	}
 };
 
 #endif /* ABSTRACTMODEL_HPP_ */

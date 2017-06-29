@@ -9,7 +9,7 @@
 using namespace cgalmesher;
 
 IntermediateTriangulation Cgal2DMesher::triangulate(const double spatialStep, const std::vector<CgalBody> bodies,		
-									std::vector<std::pair<size_t, int>>& constrainedCells)
+									std::vector<size_t>& constrainedCells)
 {
 	typedef CGAL::Delaunay_mesh_face_base_2<K>				     Fb;
 	typedef CGAL::Triangulation_data_structure_2<Vb, Fb>        Tds;
@@ -37,12 +37,29 @@ IntermediateTriangulation Cgal2DMesher::triangulate(const double spatialStep, co
 	}
 
 	Mesher mesher(cdt);
-	mesher.set_criteria(Criteria(0.125, spatialStep));
+	mesher.set_criteria(Criteria(0.001, spatialStep));
 	mesher.refine_mesh();
 	//CGAL::lloyd_optimize_mesh_2(cdt, CGAL::parameters::max_iteration_number = 10);
 
 	size_t cell_idx = 0;
-	bool isConstrained;
+	int vert_bounded;
+	for (auto cellIter = cdt.finite_faces_begin(); cellIter != cdt.finite_faces_end(); ++cellIter)
+	{
+		vert_bounded = 0;
+		for (int i = 0; i < 3; i++)
+		{
+			const auto& pt = cellIter->vertex(i)->point();
+			if (bodies[0].frac.has_on_unbounded_side(pt))
+				break;
+
+			vert_bounded++;
+		}
+		if(vert_bounded == 3)
+			constrainedCells.push_back(cell_idx);
+
+		cell_idx++;
+	}
+	/*bool isConstrained;
 	for (auto cellIter = cdt.finite_faces_begin(); cellIter != cdt.finite_faces_end(); ++cellIter)
 	{
 		isConstrained = false;
@@ -56,7 +73,7 @@ IntermediateTriangulation Cgal2DMesher::triangulate(const double spatialStep, co
 			}
 		}
 		cell_idx++;
-	}
+	}*/
 
 	// copy from CDT to IntermediateTriangulation adding info
 	// about containing body to triangulation cells
@@ -77,9 +94,9 @@ Polygon Cgal2DMesher::makePolygon(const TaskBody::Border& points) {
 	assert(points.size() >= 3); // polygon is a closed line
 
 	Polygon polygon;
-	for (const auto& p : points) {
+	for (const auto& p : points)
 		polygon.push_back(CgalPoint2(p[0], p[1]));
-	}
+
 	assert(polygon.is_simple()); // has not intersections
 
 	return polygon;

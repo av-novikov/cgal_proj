@@ -42,7 +42,6 @@ class AbstractSolver {
 		double CONV_W2, CONV_VAR;
 		int MAX_ITER;
 
-		
 		virtual void checkStability();
 
 	public:

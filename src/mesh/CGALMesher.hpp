@@ -6,6 +6,7 @@
 #include <utility>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #include <CGAL/Triangulation_face_base_with_info_2.h>
 #include <CGAL/Delaunay_triangulation_2.h>
@@ -51,24 +52,29 @@ namespace cgalmesher
 			Polygon outer;              ///< outer border of the body
 			std::vector<Polygon> inner; ///< borders of the inner cavities of the body
 			std::vector<std::pair<Point,Point>> constraint;
+			Polygon frac;
+			
 
 			CgalBody(const TaskBody& task) : id(task.id), outer(makePolygon(task.outer))
 			{
 				for (const auto& cavity : task.inner) 
 					inner.push_back(makePolygon(cavity));
 				for (const auto& con : task.constraint)
-					constraint.push_back(std::make_pair<Point, Point>({ con.first[0], con.first[1] }, 
-																	{ con.second[0], con.second[1] }));
+				{
+					constraint.push_back(std::make_pair<Point, Point>({ con.first[0], con.first[1] },
+					{ con.second[0], con.second[1] }));
+					frac.push_back(CgalPoint2(con.first[0], con.first[1]));
+				}
 			};
-			bool contains(const CgalPoint2& p) const 
+			bool contains(const CgalPoint2& p) const
 			{
 				if (outer.has_on_unbounded_side(p))
 					return false;
 				for (const Polygon& cavity : inner)
-					if (cavity.has_on_bounded_side(p)) 
+					if (cavity.has_on_bounded_side(p))
 						return false;
 				return true;
-			}
+			};
 		};
 
 		/// @name Converter structures for CGAL copy_tds function --
@@ -138,7 +144,7 @@ namespace cgalmesher
 				template<typename, typename> class CellConverter = DefaultCellConverter,
 				template<typename, typename> class VertexConverter = DefaultVertexConverter>
 		static void triangulate(const double spatialStep, const std::vector<TaskBody> bodies, ResultingTriangulation& result,
-								std::vector<std::pair<size_t, int>>& constrainedCells)
+								std::vector<size_t>& constrainedCells)
 		{
 			copyTriangulation<IntermediateTriangulation, ResultingTriangulation,
 				CellConverter, VertexConverter>(triangulate(spatialStep, convert(bodies), constrainedCells), result);
@@ -147,7 +153,7 @@ namespace cgalmesher
 	private:
 		/** The meshing itself */
 		static IntermediateTriangulation triangulate(
-			const double spatialStep, const std::vector<CgalBody> bodies, std::vector<std::pair<size_t, int>>& constrainedCells);
+			const double spatialStep, const std::vector<CgalBody> bodies, std::vector<size_t>& constrainedCells);
 
 
 		/**

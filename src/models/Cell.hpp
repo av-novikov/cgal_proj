@@ -3,7 +3,7 @@
 
 #include "src/models/Element.hpp"
 
-	enum CellType { INNER, CONSTRAINED, BORDER };
+	enum CellType { INNER, FRAC, BORDER, WELL };
 	class TriangleCell
 	{
 	public:

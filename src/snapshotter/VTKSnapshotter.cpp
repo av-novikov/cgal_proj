@@ -11,16 +11,17 @@
 #include <vtkTetra.h>
 
 #include "src/snapshotter/VTKSnapshotter.hpp"
-#include "src/models/Model.hpp"
+#include "src/models/Oil2d/Oil2d.hpp"
 
 using std::vector;
 
 template<class modelType>
 const std::string VTKSnapshotter<modelType>::prefix = "";
 template<class modelType>
-VTKSnapshotter<modelType>::VTKSnapshotter(const Mesh* _mesh) : mesh(_mesh)
+VTKSnapshotter<modelType>::VTKSnapshotter(const modelType* _model) : model(_model), mesh(_model->getMesh())
 {
 	pattern = prefix + "CGAL_First_%{STEP}.vtu";
+
 }
 template<class modelType>
 VTKSnapshotter<modelType>::~VTKSnapshotter()
@@ -48,8 +49,9 @@ template<class modelType>
 void VTKSnapshotter<modelType>::dump(const int i)
 {
 }
-void VTKSnapshotter<FirstModel>::dump(const int i)
+void VTKSnapshotter<oil2d::Oil2d>::dump(const int i)
 {
+	using namespace oil2d;
 	auto grid = vtkSmartPointer<vtkUnstructuredGrid>::New();
 	auto points = vtkSmartPointer<vtkPoints>::New();
 	auto facets = vtkSmartPointer<vtkCellArray>::New();
@@ -92,4 +94,4 @@ void VTKSnapshotter<FirstModel>::dump(const int i)
 	writer->Write();
 }
 
-template class VTKSnapshotter<FirstModel>;
+template class VTKSnapshotter<oil2d::Oil2d>;
