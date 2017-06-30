@@ -14,7 +14,7 @@ namespace oil2d
 	public:
 		typedef var::containers::TapeVar1Phase TapeVariables;
 	protected:
-		void setProps(Properties& props);
+		void setProps(const Properties& props);
 		void makeDimLess();
 		void setPerforated();
 		void setInitialState();
@@ -23,6 +23,7 @@ namespace oil2d
 		Oil_Props props_oil;
 
 		void solveInner(const Cell& cell);
+		void solveBorder(const Cell& cell);
 	public:
 		Oil2d();
 		~Oil2d();

@@ -81,4 +81,32 @@ void Oil2dSolver::solveStep()
 
 	cout << "Newton Iterations = " << iterations << endl;
 }
+void Oil2dSolver::copySolution(const paralution::LocalVector<double>& sol)
+{
+	for (int i = 0; i < model->cellsNum; i++)
+	{
+		auto& cell = (*model)[i];
+		cell.u_next.p = sol[Model::var_size * i];
+	}
+}
 
+void Oil2dSolver::fillIndices()
+{
+	int counter = 0;
+
+	/*for (const auto& cell : mesh->cells)
+	{
+		getMatrixStencil(cell);
+		for (const int idx : stencil_idx)
+		{
+			ind_i[counter] = Model::var_size * cell.id;			ind_j[counter++] = Model::var_size * idx;
+		}
+	}*/
+
+	elemNum = counter;
+	for (int i = 0; i < Model::var_size * model->cellsNum; i++)
+		ind_rhs[i] = i;
+}
+void Oil2dSolver::fill()
+{
+}

@@ -69,6 +69,7 @@ namespace mesh
 	{
 		template<typename> friend class VTKSnapshotter;
 		template<typename> friend class AbstractSolver;
+		friend class Oil2dSolver;
 	public: 
 		typedef CGAL::Exact_predicates_inexact_constructions_kernel        K;
 		typedef CGAL::Triangulation_vertex_base_with_info_2<VertexInfo, K> Vb;

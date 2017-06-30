@@ -71,7 +71,7 @@ protected:
 		cellsNum = mesh.get()->getCellsSize();
 		varNum = VarContainer::size * cellsNum;
 	}
-	virtual void setProps(propsType& props) = 0;
+	virtual void setProps(const propsType& props) = 0;
 	virtual void makeDimLess() = 0;
 	virtual void setPerforated() = 0;
 	virtual void setInitialState() = 0;
@@ -93,7 +93,7 @@ public:
 	double Q_dim;
 	double grav;
 	
-	void load(const Task& task, Properties& props)
+	void load(const Task& task, const Properties& props)
 	{
 		setProps(props);
 		loadMesh(task);

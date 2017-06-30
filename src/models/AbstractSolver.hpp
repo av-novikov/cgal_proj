@@ -11,6 +11,7 @@ class AbstractSolver {
 public:
 	typedef modelType Model;
 	typedef typename Model::Mesh Mesh;
+	typedef typename Model::Cell Cell;
 
 protected:
 
@@ -54,7 +55,6 @@ public:
 		
 	virtual void fill();
 	virtual void start();
-	
 };
 
 #endif /* ABSTRACTSOLVER_HPP_ */

@@ -14,26 +14,28 @@ namespace oil2d
 
 		double kx, ky;
 
-		std::vector<double> perm_eff;
-		std::vector<double> r_eff;
-		std::vector<double> skin;
-
 		double height;
 		double p_init;
+		double p_out;
+	};
+	struct Oil_Props
+	{
+		double visc;
+		double dens_stc;
+		double beta;
 	};
 	struct Properties
 	{
 		std::vector<double> timePeriods;
 		std::vector<double> rates;
 		std::vector<double> pwf;
-		std::vector<double> skins;
-		std::vector<double> radius;
 
-		// If left boundary condition would be 2nd type
 		bool leftBoundIsRate;
+		bool rightBoundIsPres;
 
 		std::vector<std::pair<int, int> > perfIntervals;
 		std::vector<Skeleton_Props> props_sk;
+		Oil_Props props_oil;
 
 		double ht;
 		double ht_min;
@@ -43,24 +45,6 @@ namespace oil2d
 
 		double r_w;
 		double r_e;
-		double height;
-		double m;
-		double kx, ky;
-		double dens_sk_stc;
-		double beta_sk;
-
-		double visc_oil;
-		double dens_oil_stc;
-		double beta_oil;
-		double b_oil_bore;
-
-		double p_init;
-	};
-	struct Oil_Props
-	{
-		double visc;
-		double dens_stc;
-		double beta;
 	};
 };
 

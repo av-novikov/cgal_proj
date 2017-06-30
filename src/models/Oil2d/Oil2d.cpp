@@ -13,12 +13,14 @@ Oil2d::Oil2d()
 Oil2d::~Oil2d()
 {
 }
-void Oil2d::setProps(Properties& props)
+void Oil2d::setProps(const Properties& props)
 {
 	r_w = props.r_w;
 	r_e = props.r_e;
-
 	perfIntervals = props.perfIntervals;
+
+	leftBoundIsRate = props.leftBoundIsRate;
+	rightBoundIsPres = props.rightBoundIsPres;
 
 	skeletonsNum = props.props_sk.size();
 	props_sk = props.props_sk;
@@ -32,7 +34,6 @@ void Oil2d::setProps(Properties& props)
 	for (int i = 0; i < periodsNum; i++)
 	{
 		period.push_back(props.timePeriods[i]);
-		rate.push_back(props.rates[i] / 86400.0);
 
 		if (leftBoundIsRate)
 			rate.push_back(props.rates[i] / 86400.0);
@@ -44,9 +45,8 @@ void Oil2d::setProps(Properties& props)
 	ht_min = props.ht_min;
 	ht_max = props.ht_max;
 
-	props_oil.visc = cPToPaSec(props.visc_oil);
-	props_oil.dens_stc = props.dens_oil_stc;
-	props_oil.beta = props.beta_oil;
+	props_oil = props.props_oil;
+	props_oil.visc = cPToPaSec(props_oil.visc);
 
 	alpha = props.alpha;
 
@@ -74,6 +74,8 @@ void Oil2d::makeDimLess()
 		props.dens_stc /= (P_dim * t_dim * t_dim / R_dim / R_dim);
 		props.beta /= (1.0 / P_dim);
 		props.height /= R_dim;
+		props.p_init /= P_dim;
+		props.p_out /= P_dim;
 	}
 
 	Q_dim = R_dim * R_dim * R_dim / t_dim;
@@ -133,6 +135,7 @@ double Oil2d::getRate(const size_t cell_idx)
 {
 	return 0.0;
 }
+
 void Oil2d::solveInner(const Cell& cell)
 {
 	trace_on(CellType::INNER);
@@ -141,4 +144,7 @@ void Oil2d::solveInner(const Cell& cell)
 
 	var.p <<=*/
 	trace_off();
+}
+void Oil2d::solveBorder(const Cell& cell)
+{
 }

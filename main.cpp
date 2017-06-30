@@ -1,10 +1,48 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
+
+#include "src/Scene.hpp"
+
 #include "src/models/Oil2d/Oil2d.hpp"
+#include "src/models/Oil2d/Oil2dSolver.hpp"
 
 using namespace std;
 using namespace point;
 using namespace mesh;
+
+oil2d::Properties* getProps()
+{
+	oil2d::Properties* props = new oil2d::Properties();
+	props->timePeriods.push_back(86400.0 * 20.0);
+
+	props->leftBoundIsRate = false;
+	props->rightBoundIsPres = true;
+	props->pwf.push_back(180.0 * 1.E+5);
+	props->ht = 100.0;
+	props->ht_min = 100.0;
+	props->ht_max  = 100000.0;
+
+	props->perfIntervals.push_back( make_pair(0, 0) );
+	props->r_w = 0.05;
+	props->r_e = 1000.0;
+
+	oil2d::Skeleton_Props tmp;
+	tmp.m = 0.1;
+	tmp.p_init = tmp.p_out = 200.0 * 100000.0;
+	tmp.height = 0.1;
+	tmp.kx = tmp.ky = 50.0;
+	tmp.dens_stc = 2000.0;
+	tmp.beta = 0.0 * 1.0e-10;
+	props->props_sk.push_back( tmp );
+
+	props->props_oil.beta = 1.e-9;
+	props->props_oil.dens_stc = 800.0;
+	props->props_oil.visc = 1.0;
+
+	props->alpha = 7200.0;
+
+	return props;
+}
 
 int main(int argc, char* argv[])
 {
@@ -45,12 +83,9 @@ int main(int argc, char* argv[])
 	task.bodies[0].constraint.push_back(make_pair(pt3, pt4));
 	task.bodies[0].constraint.push_back(make_pair(pt4, pt1));
 
-	oil2d::Oil2d model;
-	oil2d::Properties props;
-	model.load(task, props);
-	model.setSnapshotter(&model);
-	//model.snapshotter = std::make_shared<VTKSnapshotter<oil2d::Oil2d>>(&model);
-	model.snapshot_all(0);
+	const auto props = getProps();
+	Scene<oil2d::Oil2d, oil2d::Oil2dSolver, oil2d::Properties> scene;
+	scene.load(*props, task);
 
 	return 0;
 }
