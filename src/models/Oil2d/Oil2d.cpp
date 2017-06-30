@@ -1,7 +1,11 @@
 #include "src/models/Oil2d/Oil2d.hpp"
 #include "src/util/utils.h"
 
+#include "adolc/drivers/drivers.h"
+#include "adolc/adolc.h"
+
 using namespace oil2d;
+using namespace std;
 
 Oil2d::Oil2d()
 {
@@ -91,6 +95,7 @@ void Oil2d::makeDimLess()
 void Oil2d::setPerforated()
 {
 	// Well locating & preparing
+	Qcell[0] = 0.0;
 }
 void Oil2d::setInitialState()
 {
@@ -103,11 +108,11 @@ void Oil2d::setInitialState()
 }
 void Oil2d::setPeriod(const int period)
 {
-	/*if (leftBoundIsRate)
+	if (leftBoundIsRate)
 	{
 		Q_sum = rate[period];
 
-		if (period == 0 || rate[period - 1] < EQUALITY_TOLERANCE) {
+		/*if (period == 0 || rate[period - 1] < EQUALITY_TOLERANCE) {
 			map<int, double>::iterator it;
 			for (it = Qcell.begin(); it != Qcell.end(); ++it)
 				it->second = Q_sum * cells[it->first].hz / height_perf;
@@ -116,11 +121,24 @@ void Oil2d::setPeriod(const int period)
 			map<int, double>::iterator it;
 			for (it = Qcell.begin(); it != Qcell.end(); ++it)
 				it->second = it->second * Q_sum / rate[period - 1];
-		}
+		}*/
 	}
 	else
 	{
 		Pwf = pwf[period];
 		Q_sum = 0.0;
-	}*/
+	}
+}
+double Oil2d::getRate(const size_t cell_idx)
+{
+	return 0.0;
+}
+void Oil2d::solveInner(const Cell& cell)
+{
+	trace_on(CellType::INNER);
+	/*adouble h[varNum];
+	TapeVariables var [3];
+
+	var.p <<=*/
+	trace_off();
 }

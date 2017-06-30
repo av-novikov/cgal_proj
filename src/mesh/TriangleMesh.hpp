@@ -68,6 +68,7 @@ namespace mesh
 	class TriangleMesh
 	{
 		template<typename> friend class VTKSnapshotter;
+		template<typename> friend class AbstractSolver;
 	public: 
 		typedef CGAL::Exact_predicates_inexact_constructions_kernel        K;
 		typedef CGAL::Triangulation_vertex_base_with_info_2<VertexInfo, K> Vb;
@@ -92,9 +93,11 @@ namespace mesh
 		size_t inner_cells = 0, inner_beg;
 		size_t border_edges = 0, border_beg;
 		size_t constrained_edges = 0, constrained_beg;
+		size_t well_idx;
 		std::vector<TriangleCell> cells;
 		std::vector<VertexHandle> vertexHandles;
 		std::vector<TriangleCell*> fracCells;
+		double Volume;
 
 		void load(const Task& task)
 		{
@@ -123,6 +126,7 @@ namespace mesh
 				cell.type = CellType::INNER;
 				const auto& tri = triangulation.triangle(cellIter);
 				cell.V = fabs(tri.area());
+				Volume += cell.V;
 				const auto center = CGAL::barycenter(tri.vertex(0), 1.0 / 3.0, tri.vertex(1), 1.0 / 3.0, tri.vertex(2));
 				cell.c = { center[0], center[1] };
 			}
@@ -210,7 +214,9 @@ namespace mesh
 			std::vector<CellHandle> well_faces;
 			std::back_insert_iterator<std::vector<CellHandle>> it(well_faces);
 			it = triangulation.get_conflicts(CgalPoint2(well_pos.x, well_pos.y), std::back_inserter(well_faces));
-			cells[well_faces[0]->info().id].type = CellType::WELL;
+
+			well_idx = well_faces[0]->info().id;
+			cells[well_idx].type = CellType::WELL;
 			// Creating constrained cells
 /*			constrained_beg = cells.size();
 			cellIter = triangulation.finite_faces_begin();
@@ -248,9 +254,10 @@ namespace mesh
 			}*/
 		};
 	public:
-		TriangleMesh() {};
+		TriangleMesh() { Volume = 0.0; };
 		TriangleMesh(const Task& task)
 		{
+			Volume = 0.0;
 			load(task);
 		};
 		~TriangleMesh() {};
@@ -258,6 +265,10 @@ namespace mesh
 		int getCellsSize() const
 		{
 			return cells.size();
+		}
+		int getVerticesSize() const
+		{
+			return vertexHandles.size();
 		}
 	};
 };

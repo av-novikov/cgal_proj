@@ -8,48 +8,52 @@
 
 template <class modelType>
 class AbstractSolver {
-	protected:
+public:
+	typedef modelType Model;
+	typedef typename Model::Mesh Mesh;
 
-		modelType* model;
-		int size;
+protected:
+
+	Model* model;
+	Mesh* mesh;
+	int size;
 			
-		int curTimePeriod;
-		double Tt;
-		double cur_t, cur_t_log;
+	int curTimePeriod;
+	double Tt;
+	double cur_t, cur_t_log;
 
-		int idx1, idx2;
+	int idx1, idx2;
 
-		double t_dim;
+	double t_dim;
 
-		int iterations;
+	int iterations;
 		
-		void copyIterLayer();
-		void revertIterLayer();
-		void copyTimeLayer();
+	void copyIterLayer();
+	void revertIterLayer();
+	void copyTimeLayer();
 		
-		double convergance(int& ind, int& varInd);
-		double averValue(int varInd);
-		void averValue(std::array<double, modelType::var_size>& aver);
+	double convergance(int& ind, int& varInd);
+	double averValue(int varInd);
+	void averValue(std::array<double, modelType::var_size>& aver);
 		
-		virtual void writeData() = 0;
-		virtual void control() = 0;
-		virtual void doNextStep() = 0;
-		virtual void solveStep() = 0;
+	virtual void writeData() = 0;
+	virtual void control() = 0;
+	virtual void doNextStep();
+	virtual void solveStep() = 0;
+	double NEWTON_STEP;
+	double CHOP_MULT;
+	double MAX_SAT_CHANGE;
+	double CONV_W2, CONV_VAR;
+	int MAX_ITER;
 
-		double NEWTON_STEP;
-		double CHOP_MULT;
-		double MAX_SAT_CHANGE;
-		double CONV_W2, CONV_VAR;
-		int MAX_ITER;
+	virtual void checkStability();
 
-		virtual void checkStability();
-
-	public:
-		AbstractSolver(modelType* _model);
-		virtual ~AbstractSolver();
+public:
+	AbstractSolver(modelType* _model);
+	virtual ~AbstractSolver();
 		
-		virtual void fill();
-		virtual void start();
+	virtual void fill();
+	virtual void start();
 	
 };
 

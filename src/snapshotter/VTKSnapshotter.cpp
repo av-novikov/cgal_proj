@@ -60,8 +60,8 @@ void VTKSnapshotter<oil2d::Oil2d>::dump(const int i)
 	type->SetName("type");
 	vol->SetName("volume");
 
-	points->Allocate(mesh->triangulation.number_of_vertices());
-	facets->Allocate(mesh->triangulation.number_of_faces());
+	points->Allocate(mesh->getVerticesSize());
+	facets->Allocate(mesh->getCellsSize());
 
 	for (const auto& vhandle : mesh->vertexHandles)
 	{

@@ -2,6 +2,7 @@
 #define VARIABLES_HPP_
 
 #include <valarray>
+#include "adolc/adouble.h"
 
 namespace var
 {
@@ -12,11 +13,22 @@ namespace var
 			static const int size = 1;
 			double& p;
 		};
+		struct TapeVar1Phase
+		{
+			static const int size = 1;
+			adouble p;
+		};
 		struct Vat2phase
 		{
 			static const int size = 2;
 			double& p;
 			double& s;
+		};
+		struct TapeVar2Phase
+		{
+			static const int size = 2;
+			adouble p;
+			adouble s;
 		};
 	};
 

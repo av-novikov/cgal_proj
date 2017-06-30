@@ -13,6 +13,8 @@
 template <typename TVarContainer, typename propsType, template <typename TVarContainer> class TVariables, class modelType>
 class AbstractModel : public TVariables<TVarContainer>
 {	
+	template<typename> friend class VTKSnapshotter;
+	template<typename> friend class AbstractSolver;
 public:
 	typedef TVarContainer VarContainer;
 	typedef TVariables<TVarContainer> Variables;
@@ -90,6 +92,7 @@ public:
 	double T_dim;
 	double Q_dim;
 	double grav;
+	
 	void load(const Task& task, Properties& props)
 	{
 		setProps(props);
@@ -107,6 +110,10 @@ public:
 	int getCellsNum() {	return cellsNum; };
 	void snapshot_all(const int i) { snapshotter->dump(i); }
 	const Mesh* getMesh() const
+	{
+		return mesh.get();
+	}
+	Mesh* getMesh()
 	{
 		return mesh.get();
 	}
