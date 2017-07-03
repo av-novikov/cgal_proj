@@ -49,13 +49,13 @@ int main(int argc, char* argv[])
 	typedef Task::Body::Point Point;
 
 	Task task;
-	task.spatialStep = 0.5;
-	Task::Body::Border body1border = { { 3, 3 },{ -3, 3 },{ -3, -3 },{ 3, -3 } };
-	Task::Body::Border body2border = { { 3, 3 },{ 9, 3 },{ 9, -3 },{ 3, -3 } };
+	task.spatialStep = 50.0;
+	Task::Body::Border body1border = { { 300, 300 },{ -300, 300 },{ -300, -300 },{ 300, -300 } };
+	//Task::Body::Border body2border = { { 3, 3 },{ 9, 3 },{ 9, -3 },{ 3, -3 } };
 	task.bodies = {	Task::Body({ 0, body1border, {}})};
 
-	const double w = 0.01;
-	Point pt1 = { -0.5, -1.0 };			Point pt2 = { -1.5, 0.5 };
+	const double w = 1;
+	Point pt1 = { -50, -100 };			Point pt2 = { -150, 50 };
 	Point pt3 = pt2;		pt3[0] += w;
 	Point pt4 = pt1;		pt4[0] += w;
 	

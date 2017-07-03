@@ -4,6 +4,9 @@
 #include <vector>
 #include <utility>
 
+#include "adolc/adouble.h"
+#include "adolc/taping.h"
+
 namespace oil2d
 {
 	struct Skeleton_Props
@@ -17,12 +20,35 @@ namespace oil2d
 		double height;
 		double p_init;
 		double p_out;
+
+		inline adouble getPoro(adouble p) const
+		{
+			return (adouble)(m)* ((adouble)(1.0) + (adouble)(beta)* (p - p_init));
+		};
+		inline adouble getDensity(adouble p) const
+		{
+			return (adouble)(dens_stc);
+		};
 	};
 	struct Oil_Props
 	{
 		double visc;
 		double dens_stc;
 		double beta;
+
+		double p_ref;
+		inline adouble getB(adouble p) const
+		{
+			return exp((adouble)beta * (p - p_ref));
+		};
+		inline adouble getDensity(adouble p) const
+		{
+			return dens_stc / getB(p);
+		};
+		inline adouble getViscosity(const adouble p) const
+		{
+			return (adouble)(visc);
+		};
 	};
 	struct Properties
 	{

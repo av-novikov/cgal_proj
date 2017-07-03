@@ -6,11 +6,23 @@ using namespace std;
 
 Oil2dSolver::Oil2dSolver(Model* _model) : AbstractSolver<Model>(_model)
 {
+	y = new double[Model::var_size * size];
+	jac = new double*[Model::var_size * size];
+	for (int i = 0; i < size; i++)
+		jac[i] = new double[4 * Model::var_size];
+
 	plot_P.open("snaps/P.dat", ofstream::out);
 	plot_Q.open("snaps/Q.dat", ofstream::out);
 };
 Oil2dSolver::~Oil2dSolver()
 {
+	delete[] y;
+	for (int i = 0; i < Model::var_size * size; i++)
+		delete[] jac[i];
+	delete[] jac;
+
+	plot_P.close();
+	plot_Q.close();
 };
 void Oil2dSolver::writeData()
 {
@@ -83,30 +95,37 @@ void Oil2dSolver::solveStep()
 }
 void Oil2dSolver::copySolution(const paralution::LocalVector<double>& sol)
 {
-	for (int i = 0; i < model->cellsNum; i++)
+	for (int i = 0; i < size; i++)
 	{
 		auto& cell = (*model)[i];
 		cell.u_next.p = sol[Model::var_size * i];
 	}
 }
 
-void Oil2dSolver::fillIndices()
+void Oil2dSolver::computeJac()
 {
-	int counter = 0;
+	trace_on(0);
 
-	/*for (const auto& cell : mesh->cells)
+	for (int i = 0; i < size; i++)
+		model->x[i].p <<= model->u_next[i];
+
+	adouble isInner, isBorder, isWell;
+	for (int i = 0; i < size; i++)
 	{
-		getMatrixStencil(cell);
-		for (const int idx : stencil_idx)
-		{
-			ind_i[counter] = Model::var_size * cell.id;			ind_j[counter++] = Model::var_size * idx;
-		}
-	}*/
+		const auto& cell = mesh->cells[i];
+		isInner = (cell.type == CellType::INNER) ? true : false;
+		isBorder = (cell.type == CellType::BORDER) ? true : false;
+		// isWell = (cell.type == CellType::WELL) ? true : false;
 
-	elemNum = counter;
-	for (int i = 0; i < Model::var_size * model->cellsNum; i++)
-		ind_rhs[i] = i;
+		condassign(model->h[i], isInner, model->solveInner(i));
+	}
+
+	for (int i = 0; i < Model::var_size * size; i++)
+		model->h[i] >>= y[i];
+
+	trace_off();
 }
 void Oil2dSolver::fill()
 {
+
 }

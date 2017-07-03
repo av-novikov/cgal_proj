@@ -37,7 +37,7 @@ IntermediateTriangulation Cgal2DMesher::triangulate(const double spatialStep, co
 	}
 
 	Mesher mesher(cdt);
-	mesher.set_criteria(Criteria(0.001, spatialStep));
+	mesher.set_criteria(Criteria(0.1, spatialStep));
 	mesher.refine_mesh();
 	//CGAL::lloyd_optimize_mesh_2(cdt, CGAL::parameters::max_iteration_number = 10);
 

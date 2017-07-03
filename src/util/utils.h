@@ -22,20 +22,6 @@ using std::make_pair;
 using std::ifstream;
 using std::function;
 
-struct FillFoo
-{
-	std::vector<vector<function<double(int, int)> > > mat;
-	std::vector<function<double(int)> > rhs;
-
-	FillFoo& operator=(const FillFoo& a)
-	{
-		mat = a.mat;
-		rhs = a.rhs;
-
-		return *this;
-	}
-};
-
 inline constexpr double delta(const int i, const int j)
 {
 	return (i == j);

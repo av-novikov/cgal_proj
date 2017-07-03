@@ -12,6 +12,8 @@ Oil2d::Oil2d()
 }
 Oil2d::~Oil2d()
 {
+
+	delete[] x, h;
 }
 void Oil2d::setProps(const Properties& props)
 {
@@ -98,6 +100,9 @@ void Oil2d::setPerforated()
 {
 	// Well locating & preparing
 	Qcell[0] = 0.0;
+
+	x = new TapeVariable[cellsNum];
+	h = new adouble[var_size * cellsNum];
 }
 void Oil2d::setInitialState()
 {
@@ -136,15 +141,22 @@ double Oil2d::getRate(const size_t cell_idx)
 	return 0.0;
 }
 
-void Oil2d::solveInner(const Cell& cell)
+adouble Oil2d::solveInner(const Cell& cell)
 {
-	trace_on(CellType::INNER);
-	/*adouble h[varNum];
-	TapeVariables var [3];
+	const auto& cur = x[cell.id];
+	const auto& prev = (*this)[cell.id].u_prev;
 
-	var.p <<=*/
-	trace_off();
+	adouble H = props_sk[0].getPoro(cur.p) * props_sk[0].getDensity(cur.p) - props_sk[0].getPoro(prev.p) * props_sk[0].getDensity(prev.p);
+	for (const int nebr_idx : cell.nebr)
+	{
+		const auto& beta = mesh->cells[nebr_idx];
+		const auto& nebr = x[nebr_idx];
+
+		H += ht / cell.V / props_oil.getViscosity(nebr.p);
+	}
+	return H;
 }
-void Oil2d::solveBorder(const Cell& cell)
+adouble Oil2d::solveBorder(const Cell& cell)
 {
+	return 0;
 }

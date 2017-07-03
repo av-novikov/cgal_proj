@@ -69,7 +69,6 @@ namespace mesh
 	{
 		template<typename> friend class VTKSnapshotter;
 		template<typename> friend class AbstractSolver;
-		friend class Oil2dSolver;
 	public: 
 		typedef CGAL::Exact_predicates_inexact_constructions_kernel        K;
 		typedef CGAL::Triangulation_vertex_base_with_info_2<VertexInfo, K> Vb;
@@ -89,7 +88,7 @@ namespace mesh
 		typedef TriangleCell Cell;
 
 		static const int CELL_POINTS_NUMBER = 3;	
-	protected:
+	public:
 		Triangulation triangulation;
 		size_t inner_cells = 0, inner_beg;
 		size_t border_edges = 0, border_beg;
@@ -154,6 +153,10 @@ namespace mesh
 					const auto& nebr = cellIter->neighbor(i);
 					if (!triangulation.is_infinite(nebr))
 					{
+						cell.length[i] = sqrt(fabs(CGAL::squared_distance(cellIter->vertex(cellIter->cw(i))->point(), cellIter->vertex(cellIter->ccw(i))->point())));
+						const point::Point2d& p1 = { cellIter->vertex(cellIter->cw(i))->point()[0], cellIter->vertex(cellIter->cw(i))->point()[1] };
+						const point::Point2d& p2 = { cellIter->vertex(cellIter->ccw(i))->point()[0], cellIter->vertex(cellIter->ccw(i))->point()[1] };
+						cell.dist[i] = point::distance(cell.c, (p1 + p2) / 2.0);
 						cell.nebr[i] = nebr->info().id;
 						nebrCounter++;
 					}
