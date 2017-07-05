@@ -276,3 +276,5 @@ __pycache__/
 
 *.vtu
 *.vts
+snaps/
+*.tap

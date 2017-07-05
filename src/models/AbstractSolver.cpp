@@ -18,6 +18,7 @@ AbstractSolver<modelType>::AbstractSolver(modelType* _model) : model(_model), me
 	//idx2 = idx1 + model->cellsNum_z + 1;
 
 	t_dim = model->t_dim;
+	repeat = 0;
 }
 template <class modelType>
 AbstractSolver<modelType>::~AbstractSolver()

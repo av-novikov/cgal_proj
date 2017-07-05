@@ -29,7 +29,10 @@ public:
 		paralution::init_paralution();
 
 		method = std::make_shared<Method>(model.get());
-		model->snapshot_all(0);
+	}
+	void start()
+	{
+		method->start();
 	}
 };
 

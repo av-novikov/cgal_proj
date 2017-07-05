@@ -10,6 +10,7 @@ class VTKSnapshotter
 public:
 	typedef modelType Model;
 	typedef typename Model::Mesh Mesh;
+	typedef typename Model::Cell Cell;
 private:
 	static const std::string prefix;
 	std::string pattern;

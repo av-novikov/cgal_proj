@@ -24,6 +24,8 @@ namespace oil2d
 	public:
 		Oil2dSolver(Model* _model);
 		~Oil2dSolver();
+
+		void start();
 	};
 };
 

@@ -39,7 +39,7 @@ namespace oil2d
 		double p_ref;
 		inline adouble getB(adouble p) const
 		{
-			return exp((adouble)beta * (p - p_ref));
+			return exp(-(adouble)beta * (p - p_ref));
 		};
 		inline adouble getDensity(adouble p) const
 		{
@@ -71,6 +71,8 @@ namespace oil2d
 
 		double r_w;
 		double r_e;
+
+		double R_dim;
 	};
 };
 

@@ -1,15 +1,35 @@
 #include "src/models/Oil2d/Oil2dSolver.hpp"
 #include <iostream>
 
+#include "adolc/sparse/sparsedrivers.h"
+#include "adolc/drivers/drivers.h"
+
 using namespace oil2d;
-using namespace std;
+using std::vector;
+using std::ofstream;
+using std::map;
+using std::endl;
+using std::setprecision;
 
 Oil2dSolver::Oil2dSolver(Model* _model) : AbstractSolver<Model>(_model)
 {
 	y = new double[Model::var_size * size];
 	jac = new double*[Model::var_size * size];
 	for (int i = 0; i < size; i++)
-		jac[i] = new double[4 * Model::var_size];
+		jac[i] = new double[Model::var_size * size];
+
+	const int strNum = Model::var_size * model->cellsNum;
+	ind_i = new int[stencil * Model::var_size * strNum];
+	ind_j = new int[stencil * Model::var_size * strNum];
+	cols = new int[strNum];
+	a = new double[stencil * Model::var_size * strNum];
+	ind_rhs = new int[strNum];
+	rhs = new double[strNum];
+
+	options[0] = 0;          /* sparsity pattern by index domains (default) */
+	options[1] = 0;          /*                         safe mode (default) */
+	options[2] = 0;          /*              not required if options[0] = 0 */
+	options[3] = 0;          /*                column compression (default) */
 
 	plot_P.open("snaps/P.dat", ofstream::out);
 	plot_Q.open("snaps/Q.dat", ofstream::out);
@@ -20,6 +40,10 @@ Oil2dSolver::~Oil2dSolver()
 	for (int i = 0; i < Model::var_size * size; i++)
 		delete[] jac[i];
 	delete[] jac;
+
+	delete[] ind_i, ind_j, ind_rhs;
+	delete[] cols;
+	delete[] a, rhs;
 
 	plot_P.close();
 	plot_Q.close();
@@ -70,6 +94,28 @@ void Oil2dSolver::control()
 
 	cur_t += model->ht;
 }
+void Oil2dSolver::start()
+{
+	int counter = 0;
+	iterations = 8;
+
+	fillIndices();
+	solver.Init(Model::var_size * model->cellsNum, 1.e-15, 1.e-15);
+
+	model->setPeriod(curTimePeriod);
+	while (cur_t < Tt)
+	{
+		control();
+		model->snapshot_all(counter++);
+		doNextStep();
+		copyTimeLayer();
+		cout << "---------------------NEW TIME STEP---------------------" << endl;
+		cout << setprecision(6);
+		cout << "time = " << cur_t << endl;
+	}
+	model->snapshot_all(counter++);
+	writeData();
+}
 void Oil2dSolver::solveStep()
 {
 	int cellIdx, varIdx;
@@ -81,13 +127,18 @@ void Oil2dSolver::solveStep()
 	{
 		copyIterLayer();
 
+		computeJac();
 		fill();
-		//solver.Assemble(ind_i, ind_j, a, elemNum, ind_rhs, rhs);
-		//solver.Solve();
-		//copySolution(solver.getSolution());
+		solver.Assemble(ind_i, ind_j, a, elemNum, ind_rhs, rhs);
+ 		solver.Solve();
+		copySolution(solver.getSolution());
+
+		if (repeat == 0)
+			repeat = 1;
 
 		err_newton = convergance(cellIdx, varIdx);
 		aver = averValue(0);		dAver = fabs(aver - averPrev);		averPrev = aver;
+		model->snapshot_all(iterations+1);
 		iterations++;
 	}
 
@@ -98,7 +149,8 @@ void Oil2dSolver::copySolution(const paralution::LocalVector<double>& sol)
 	for (int i = 0; i < size; i++)
 	{
 		auto& cell = (*model)[i];
-		cell.u_next.p = sol[Model::var_size * i];
+		double a = sol[Model::var_size * i];
+		cell.u_next.p += sol[Model::var_size * i];
 	}
 }
 
@@ -109,16 +161,23 @@ void Oil2dSolver::computeJac()
 	for (int i = 0; i < size; i++)
 		model->x[i].p <<= model->u_next[i];
 
-	adouble isInner, isBorder, isWell;
-	for (int i = 0; i < size; i++)
+	//adouble isInner, isBorder, isWell;
+	for (int i = 0; i < mesh->inner_cells; i++)
 	{
 		const auto& cell = mesh->cells[i];
-		isInner = (cell.type == CellType::INNER) ? true : false;
-		isBorder = (cell.type == CellType::BORDER) ? true : false;
+		//isInner = (cell.type == CellType::INNER) ? true : false;
+		//isBorder = (cell.type == CellType::BORDER) ? true : false;
 		// isWell = (cell.type == CellType::WELL) ? true : false;
-
-		condassign(model->h[i], isInner, model->solveInner(i));
+		model->h[i] = model->solveInner(cell);
 	}
+	for (int i = mesh->border_beg; i < model->cellsNum; i++)
+	{
+		const auto& cell = mesh->cells[i];
+		model->h[i] = model->solveBorder(cell);
+	}
+
+	const int well_idx = mesh->well_idx;
+	model->h[well_idx] += mesh->cells[well_idx].V * model->ht * model->props_oil.getDensity(model->x[well_idx].p) * model->Q_sum;
 
 	for (int i = 0; i < Model::var_size * size; i++)
 		model->h[i] >>= y[i];
@@ -127,5 +186,28 @@ void Oil2dSolver::computeJac()
 }
 void Oil2dSolver::fill()
 {
+	jacobian(0, Model::var_size * model->cellsNum, Model::var_size * model->cellsNum, &model->u_next[0], jac);
+	//function(0, Model::var_size * model->cellsNum, Model::var_size * model->cellsNum, &model->u_next[0], y);
+	/*sparse_jac(0, Model::var_size * model->cellsNum, Model::var_size * model->cellsNum, repeat,
+		&model->u_next[0], &elemNum, (unsigned int**)(&ind_i), (unsigned int**)(&ind_j), &y, options);*/
 
+	int counter = 0;
+	for (const auto& cell : mesh->cells)
+	{
+		//model->setVariables(cell);
+
+		getMatrixStencil(cell);
+		for (int i = 0; i < Model::var_size; i++)
+		{
+			const int str_idx = Model::var_size * cell.id + i;
+			for (const int idx : stencil_idx)
+			{
+				for (int j = 0; j < Model::var_size; j++)
+					a[counter++] = jac[str_idx][Model::var_size * idx + j];
+			}
+
+			rhs[str_idx] = -y[str_idx];
+		}
+		stencil_idx.clear();
+	}
 }

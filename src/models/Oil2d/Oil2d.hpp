@@ -8,8 +8,11 @@
 
 namespace oil2d
 {
+	const int stencil = 4;
+
 	class Oil2d : public AbstractModel<var::containers::Var1phase, oil2d::Properties, var::BasicVariables, Oil2d>
 	{
+		template<typename> friend class VTKSnapshotter;
 		friend class Oil2dSolver;
 	public:
 		typedef var::containers::TapeVar1Phase TapeVariable;
@@ -25,19 +28,21 @@ namespace oil2d
 		std::vector<Skeleton_Props> props_sk;
 		Oil_Props props_oil;
 
-		double getPerm(const Cell& cell)
+		const double getPerm(const Cell& cell) const
 		{
-			if (cell.type == CellType::INNER)
+			if (cell.type == CellType::INNER || cell.type == CellType::BORDER)
 				return props_sk[0].kx;
-			else if (cell.type == CellType::FRAC)
+			else
 				return props_sk[0].kx * 100.0;
 		};
-		/*double getTrans(const Cell& cell1, const Cell& cell2)
+		double getTrans(const Cell& cell1, const int idx, const Cell& cell2) const
 		{
 			const double k1 = getPerm(cell1);
 			const double k2 = getPerm(cell2);
-			const double S = props_sk[0].height * props
-		};*/
+			const double dist1 = cell1.dist[idx];
+			const double dist2 = cell2.getDistance(cell1.id);
+			return props_sk[0].height * cell1.length[idx] * k1 * k2 / (k1 * dist2 + k2 * dist1);
+		};
 
 		adouble solveInner(const Cell& cell);
 		adouble solveBorder(const Cell& cell);

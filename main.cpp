@@ -15,15 +15,15 @@ oil2d::Properties* getProps()
 	oil2d::Properties* props = new oil2d::Properties();
 	props->timePeriods.push_back(86400.0 * 20.0);
 
-	props->leftBoundIsRate = false;
+	props->leftBoundIsRate = true;
 	props->rightBoundIsPres = true;
-	props->pwf.push_back(180.0 * 1.E+5);
+	props->rates.push_back(1.0);
 	props->ht = 100.0;
 	props->ht_min = 100.0;
 	props->ht_max  = 100000.0;
 
 	props->perfIntervals.push_back( make_pair(0, 0) );
-	props->r_w = 0.05;
+	props->r_w = props->R_dim = 0.05;
 	props->r_e = 1000.0;
 
 	oil2d::Skeleton_Props tmp;
@@ -38,54 +38,66 @@ oil2d::Properties* getProps()
 	props->props_oil.beta = 1.e-9;
 	props->props_oil.dens_stc = 800.0;
 	props->props_oil.visc = 1.0;
+	props->props_oil.p_ref = tmp.p_init;
 
 	props->alpha = 7200.0;
 
 	return props;
 }
 
-int main(int argc, char* argv[])
+Task* getMeshTask(const double x_dim)
 {
+	Task* task = new Task;
+
 	typedef Task::Body::Point Point;
 
-	Task task;
-	task.spatialStep = 50.0;
-	Task::Body::Border body1border = { { 300, 300 },{ -300, 300 },{ -300, -300 },{ 300, -300 } };
+	task->spatialStep = 50.0 / x_dim;
+	Task::Body::Border body1border = { { 300 / x_dim, 300 / x_dim },
+										{ -300 / x_dim, 300 / x_dim },
+										{ -300 / x_dim, -300 / x_dim },
+										{ 300 / x_dim, -300 / x_dim } };
 	//Task::Body::Border body2border = { { 3, 3 },{ 9, 3 },{ 9, -3 },{ 3, -3 } };
-	task.bodies = {	Task::Body({ 0, body1border, {}})};
+	task->bodies = { Task::Body({ 0, body1border,{} }) };
 
-	const double w = 1;
-	Point pt1 = { -50, -100 };			Point pt2 = { -150, 50 };
+	const double w = 1.0 / x_dim;
+	Point pt1 = { -50 / x_dim, -100 / x_dim };			Point pt2 = { -150 / x_dim, 50 / x_dim };
 	Point pt3 = pt2;		pt3[0] += w;
 	Point pt4 = pt1;		pt4[0] += w;
-	
+
 	const int SIZE = 1;
 	double dx = (pt2[0] - pt1[0]) / (double)SIZE;
 	double dy = (pt2[1] - pt1[1]) / (double)SIZE;
 	Point p1, p2;
-	for (int i = 0; i < SIZE-1; i++)
+	for (int i = 0; i < SIZE - 1; i++)
 	{
-		p1 = {pt1[0] + (double)i * dx, pt1[1] + (double)i * dy};
-		p2 = {pt1[0] + (double)(i+1) * dx, pt1[1] + (double)(i+1) * dy };
-		task.bodies[0].constraint.push_back(make_pair(p1, p2));
+		p1 = { pt1[0] + (double)i * dx, pt1[1] + (double)i * dy };
+		p2 = { pt1[0] + (double)(i + 1) * dx, pt1[1] + (double)(i + 1) * dy };
+		task->bodies[0].constraint.push_back(make_pair(p1, p2));
 	}
-	task.bodies[0].constraint.push_back(make_pair(pt1, pt2));
-	task.bodies[0].constraint.push_back(make_pair(pt2, pt3));
+	task->bodies[0].constraint.push_back(make_pair(pt1, pt2));
+	task->bodies[0].constraint.push_back(make_pair(pt2, pt3));
 
 	dx = (pt4[0] - pt3[0]) / (double)SIZE;
 	dy = (pt4[1] - pt3[1]) / (double)SIZE;
-	for (int i = 0; i < SIZE-1; i++)
+	for (int i = 0; i < SIZE - 1; i++)
 	{
 		p1 = { pt3[0] + (double)i * dx, pt3[1] + (double)i * dy };
 		p2 = { pt3[0] + (double)(i + 1) * dx, pt3[1] + (double)(i + 1) * dy };
-		task.bodies[0].constraint.push_back(make_pair(p1, p2));
+		task->bodies[0].constraint.push_back(make_pair(p1, p2));
 	}
-	task.bodies[0].constraint.push_back(make_pair(pt3, pt4));
-	task.bodies[0].constraint.push_back(make_pair(pt4, pt1));
+	task->bodies[0].constraint.push_back(make_pair(pt3, pt4));
+	task->bodies[0].constraint.push_back(make_pair(pt4, pt1));
 
+	return task;
+}
+
+int main(int argc, char* argv[])
+{
 	const auto props = getProps();
+	const auto task = getMeshTask(props->R_dim);
 	Scene<oil2d::Oil2d, oil2d::Oil2dSolver, oil2d::Properties> scene;
-	scene.load(*props, task);
+	scene.load(*props, *task);
+	scene.start();
 
 	return 0;
 }

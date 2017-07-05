@@ -16,7 +16,7 @@
 using std::vector;
 
 template<class modelType>
-const std::string VTKSnapshotter<modelType>::prefix = "";
+const std::string VTKSnapshotter<modelType>::prefix = "snaps/";
 template<class modelType>
 VTKSnapshotter<modelType>::VTKSnapshotter(const modelType* _model) : model(_model), mesh(_model->getMesh())
 {
@@ -59,6 +59,15 @@ void VTKSnapshotter<oil2d::Oil2d>::dump(const int i)
 	auto vol = vtkSmartPointer<vtkDoubleArray>::New();
 	type->SetName("type");
 	vol->SetName("volume");
+	auto id = vtkSmartPointer<vtkIntArray>::New();
+	id->SetName("id");
+
+	auto pres = vtkSmartPointer<vtkDoubleArray>::New();
+	pres->SetName("pressure");
+	auto perm_x = vtkSmartPointer<vtkDoubleArray>::New();
+	perm_x->SetName("k_x");
+	auto perm_y = vtkSmartPointer<vtkDoubleArray>::New();
+	perm_y->SetName("k_y");
 
 	points->Allocate(mesh->getVerticesSize());
 	facets->Allocate(mesh->getCellsSize());
@@ -66,11 +75,11 @@ void VTKSnapshotter<oil2d::Oil2d>::dump(const int i)
 	for (const auto& vhandle : mesh->vertexHandles)
 	{
 		const auto& pt = vhandle->point();
-		points->InsertNextPoint(pt[0], pt[1], 0.0);
+		points->InsertNextPoint(pt[0] * model->R_dim, pt[1] * model->R_dim, 0.0);
 	}
 	for (int i = 0; i < mesh->inner_cells; i++) 
 	{
-		const TriangleCell& cell = mesh->cells[i];
+		const Cell& cell = mesh->cells[i];
 		auto vtkCell = vtkSmartPointer<vtkTriangle>::New();
 
 		for (int i = 0; i < Mesh::CELL_POINTS_NUMBER; i++) 
@@ -79,6 +88,10 @@ void VTKSnapshotter<oil2d::Oil2d>::dump(const int i)
 		facets->InsertNextCell(vtkCell);
 		type->InsertNextValue(cell.type);
 		vol->InsertNextValue(cell.V);
+		id->InsertNextValue(cell.id);
+		pres->InsertNextValue(model->u_next[i] * model->P_dim);
+		perm_x->InsertNextValue(model->getPerm(cell) * model->R_dim * model->R_dim);
+		perm_y->InsertNextValue(model->getPerm(cell) * model->R_dim * model->R_dim);
 	}
 
 	grid->SetPoints(points);
@@ -86,6 +99,10 @@ void VTKSnapshotter<oil2d::Oil2d>::dump(const int i)
 	vtkCellData* fd = grid->GetCellData();
 	fd->AddArray(type);
 	fd->AddArray(vol);
+	fd->AddArray(id);
+	fd->AddArray(pres);
+	fd->AddArray(perm_x);
+	fd->AddArray(perm_y);
 
 	// Writing
 	auto writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();

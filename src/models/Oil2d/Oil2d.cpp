@@ -17,6 +17,7 @@ Oil2d::~Oil2d()
 }
 void Oil2d::setProps(const Properties& props)
 {
+	R_dim = props.R_dim;
 	r_w = props.r_w;
 	r_e = props.r_e;
 	perfIntervals = props.perfIntervals;
@@ -56,7 +57,6 @@ void Oil2d::setProps(const Properties& props)
 }
 void Oil2d::makeDimLess()
 {
-	R_dim = r_w;
 	t_dim = 3600.0;
 	P_dim = props_sk[0].p_init;
 
@@ -93,6 +93,7 @@ void Oil2d::makeDimLess()
 	props_oil.visc /= (P_dim * t_dim);
 	props_oil.dens_stc /= (P_dim * t_dim * t_dim / R_dim / R_dim);
 	props_oil.beta /= (1.0 / P_dim);
+	props_oil.p_ref /= P_dim;
 
 	alpha /= t_dim;
 }
@@ -146,17 +147,27 @@ adouble Oil2d::solveInner(const Cell& cell)
 	const auto& cur = x[cell.id];
 	const auto& prev = (*this)[cell.id].u_prev;
 
-	adouble H = props_sk[0].getPoro(cur.p) * props_sk[0].getDensity(cur.p) - props_sk[0].getPoro(prev.p) * props_sk[0].getDensity(prev.p);
-	for (const int nebr_idx : cell.nebr)
+	adouble H = cell.V * (props_sk[0].getPoro(cur.p) * props_sk[0].getDensity(cur.p) - props_sk[0].getPoro(prev.p) * props_sk[0].getDensity(prev.p));
+	for (int i = 0; i < 3; i++)
 	{
+		const int nebr_idx = cell.nebr[i];
 		const auto& beta = mesh->cells[nebr_idx];
 		const auto& nebr = x[nebr_idx];
 
-		H += ht / cell.V / props_oil.getViscosity(nebr.p);
+		H += ht * getTrans(cell, i, beta) *
+			linearAppr(props_oil.getDensity(cur.p) / props_oil.getViscosity(cur.p), cell.dist[i],
+				props_oil.getDensity(nebr.p) / props_oil.getViscosity(nebr.p), beta.getDistance(cell.id)) *
+				(cur.p - nebr.p);
 	}
 	return H;
 }
 adouble Oil2d::solveBorder(const Cell& cell)
 {
-	return 0;
+	const auto& cur = x[cell.id];
+	const auto& nebr = x[cell.nebr[0]];
+	adouble H;
+	adouble rightIsPres = rightBoundIsPres;
+	condassign(H, rightIsPres, (cur.p - (adouble)(props_sk[0].p_out)) / P_dim, (cur.p - nebr.p) / P_dim);
+
+	return H;
 }

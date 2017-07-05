@@ -76,9 +76,12 @@ protected:
 	double* a;
 	int* ind_rhs;
 	double* rhs;
+	int* cols;
 	// Number of non-zero elements in sparse matrix
 	int elemNum;
 
+	int options[4];
+	int repeat;
 public:
 	AbstractSolver(modelType* _model);
 	virtual ~AbstractSolver();
