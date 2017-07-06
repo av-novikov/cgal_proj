@@ -23,8 +23,11 @@
 		const double& getDistance(const size_t idx) const 
 		{
 			for (int i = 0; i < 3; i++)
+			{
 				if (nebr[i] == idx)
 					return dist[i];
+			}
+			exit(-1);
 		};
 	};
 

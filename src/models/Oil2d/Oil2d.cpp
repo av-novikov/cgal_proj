@@ -110,8 +110,12 @@ void Oil2d::setInitialState()
 	const auto& props = props_sk[0];
 	for (size_t i = 0; i < cellsNum; i++)
 	{
-		auto cell = (*this)[i];
-		cell.u_prev.p = cell.u_iter.p = cell.u_next.p = props.p_init;
+		const auto& cell = mesh->cells[i];
+		auto data = (*this)[i];
+		if(cell.type == CellType::FRAC)
+			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init * 0.95;
+		else
+			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init;
 	}
 }
 void Oil2d::setPeriod(const int period)
@@ -147,14 +151,14 @@ adouble Oil2d::solveInner(const Cell& cell)
 	const auto& cur = x[cell.id];
 	const auto& prev = (*this)[cell.id].u_prev;
 
-	adouble H = cell.V * (props_sk[0].getPoro(cur.p) * props_sk[0].getDensity(cur.p) - props_sk[0].getPoro(prev.p) * props_sk[0].getDensity(prev.p));
+	adouble H = props_sk[0].getPoro(cur.p) * props_oil.getDensity(cur.p) - props_sk[0].getPoro(prev.p) * props_oil.getDensity(prev.p);
 	for (int i = 0; i < 3; i++)
 	{
 		const int nebr_idx = cell.nebr[i];
 		const auto& beta = mesh->cells[nebr_idx];
 		const auto& nebr = x[nebr_idx];
 
-		H += ht * getTrans(cell, i, beta) *
+		H += ht / cell.V * getTrans(cell, i, beta) *
 			linearAppr(props_oil.getDensity(cur.p) / props_oil.getViscosity(cur.p), cell.dist[i],
 				props_oil.getDensity(nebr.p) / props_oil.getViscosity(nebr.p), beta.getDistance(cell.id)) *
 				(cur.p - nebr.p);

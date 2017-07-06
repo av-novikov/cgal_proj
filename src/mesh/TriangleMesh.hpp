@@ -147,16 +147,18 @@ namespace mesh
 			{
 				TriangleCell& cell = cells[cell_idx];
 				nebrCounter = 0;
+
 				for (int i = 0; i < CELL_POINTS_NUMBER; i++)
 				{
 					cell.points[i] = cellIter->vertex(i)->info();
 					const auto& nebr = cellIter->neighbor(i);
+
+					cell.length[i] = sqrt(fabs(CGAL::squared_distance(cellIter->vertex(cellIter->cw(i))->point(), cellIter->vertex(cellIter->ccw(i))->point())));
+					const point::Point2d& pt1 = { cellIter->vertex(cellIter->cw(i))->point()[0], cellIter->vertex(cellIter->cw(i))->point()[1] };
+					const point::Point2d& pt2 = { cellIter->vertex(cellIter->ccw(i))->point()[0], cellIter->vertex(cellIter->ccw(i))->point()[1] };
+					cell.dist[i] = point::distance(cell.c, (pt1 + pt2) / 2.0);
 					if (!triangulation.is_infinite(nebr))
 					{
-						cell.length[i] = sqrt(fabs(CGAL::squared_distance(cellIter->vertex(cellIter->cw(i))->point(), cellIter->vertex(cellIter->ccw(i))->point())));
-						const point::Point2d& p1 = { cellIter->vertex(cellIter->cw(i))->point()[0], cellIter->vertex(cellIter->cw(i))->point()[1] };
-						const point::Point2d& p2 = { cellIter->vertex(cellIter->ccw(i))->point()[0], cellIter->vertex(cellIter->ccw(i))->point()[1] };
-						cell.dist[i] = point::distance(cell.c, (p1 + p2) / 2.0);
 						cell.nebr[i] = nebr->info().id;
 						nebrCounter++;
 					}
@@ -176,19 +178,6 @@ namespace mesh
 						border_edges++;
 					}
 				}
-				/*if (vecCounter < constrainedCells.size())
-				{
-					if (constrainedCells[vecCounter] == cell_idx)
-					{
-						vecCounter++;
-						cell.type = CellType::CONSTRAINED;
-					}
-				}
-				if (nebrCounter == CELL_POINTS_NUMBER)
-					cell.type = CellType::INNER;
-				else if (nebrCounter < CELL_POINTS_NUMBER)
-					cell.type = CellType::INNER;*/
-
 				++cellIter;
 			}
 

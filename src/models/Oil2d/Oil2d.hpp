@@ -33,7 +33,7 @@ namespace oil2d
 			if (cell.type == CellType::INNER || cell.type == CellType::BORDER)
 				return props_sk[0].kx;
 			else
-				return props_sk[0].kx * 100.0;
+				return props_sk[0].kx * 1000.0;
 		};
 		double getTrans(const Cell& cell1, const int idx, const Cell& cell2) const
 		{

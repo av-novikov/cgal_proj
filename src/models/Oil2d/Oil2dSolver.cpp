@@ -14,9 +14,9 @@ using std::setprecision;
 Oil2dSolver::Oil2dSolver(Model* _model) : AbstractSolver<Model>(_model)
 {
 	y = new double[Model::var_size * size];
-	jac = new double*[Model::var_size * size];
+	/*jac = new double*[Model::var_size * size];
 	for (int i = 0; i < size; i++)
-		jac[i] = new double[Model::var_size * size];
+		jac[i] = new double[Model::var_size * size];*/
 
 	const int strNum = Model::var_size * model->cellsNum;
 	ind_i = new int[stencil * Model::var_size * strNum];
@@ -37,9 +37,9 @@ Oil2dSolver::Oil2dSolver(Model* _model) : AbstractSolver<Model>(_model)
 Oil2dSolver::~Oil2dSolver()
 {
 	delete[] y;
-	for (int i = 0; i < Model::var_size * size; i++)
+	/*for (int i = 0; i < Model::var_size * size; i++)
 		delete[] jac[i];
-	delete[] jac;
+	delete[] jac;*/
 
 	delete[] ind_i, ind_j, ind_rhs;
 	delete[] cols;
@@ -130,15 +130,14 @@ void Oil2dSolver::solveStep()
 		computeJac();
 		fill();
 		solver.Assemble(ind_i, ind_j, a, elemNum, ind_rhs, rhs);
- 		solver.Solve();
+ 		solver.Solve(PRECOND::ILU_SERIOUS);
 		copySolution(solver.getSolution());
 
-		if (repeat == 0)
-			repeat = 1;
+		//if (repeat == 0)
+		//	repeat = 1;
 
 		err_newton = convergance(cellIdx, varIdx);
 		aver = averValue(0);		dAver = fabs(aver - averPrev);		averPrev = aver;
-		model->snapshot_all(iterations+1);
 		iterations++;
 	}
 
@@ -149,7 +148,6 @@ void Oil2dSolver::copySolution(const paralution::LocalVector<double>& sol)
 	for (int i = 0; i < size; i++)
 	{
 		auto& cell = (*model)[i];
-		double a = sol[Model::var_size * i];
 		cell.u_next.p += sol[Model::var_size * i];
 	}
 }
@@ -168,7 +166,7 @@ void Oil2dSolver::computeJac()
 		//isInner = (cell.type == CellType::INNER) ? true : false;
 		//isBorder = (cell.type == CellType::BORDER) ? true : false;
 		// isWell = (cell.type == CellType::WELL) ? true : false;
-		model->h[i] = model->solveInner(cell);
+		model->h[i] = cell.V * model->solveInner(cell);
 	}
 	for (int i = mesh->border_beg; i < model->cellsNum; i++)
 	{
@@ -186,28 +184,28 @@ void Oil2dSolver::computeJac()
 }
 void Oil2dSolver::fill()
 {
-	jacobian(0, Model::var_size * model->cellsNum, Model::var_size * model->cellsNum, &model->u_next[0], jac);
+	//jacobian(0, Model::var_size * model->cellsNum, Model::var_size * model->cellsNum, &model->u_next[0], jac);
 	//function(0, Model::var_size * model->cellsNum, Model::var_size * model->cellsNum, &model->u_next[0], y);
-	/*sparse_jac(0, Model::var_size * model->cellsNum, Model::var_size * model->cellsNum, repeat,
-		&model->u_next[0], &elemNum, (unsigned int**)(&ind_i), (unsigned int**)(&ind_j), &y, options);*/
+	sparse_jac(0, Model::var_size * model->cellsNum, Model::var_size * model->cellsNum, repeat,
+		&model->u_next[0], &elemNum, (unsigned int**)(&ind_i), (unsigned int**)(&ind_j), &a, options);
 
 	int counter = 0;
 	for (const auto& cell : mesh->cells)
 	{
 		//model->setVariables(cell);
 
-		getMatrixStencil(cell);
+		//getMatrixStencil(cell);
 		for (int i = 0; i < Model::var_size; i++)
 		{
 			const int str_idx = Model::var_size * cell.id + i;
-			for (const int idx : stencil_idx)
+			/*for (const int idx : stencil_idx)
 			{
 				for (int j = 0; j < Model::var_size; j++)
 					a[counter++] = jac[str_idx][Model::var_size * idx + j];
-			}
+			}*/
 
 			rhs[str_idx] = -y[str_idx];
 		}
-		stencil_idx.clear();
+		//stencil_idx.clear();
 	}
 }

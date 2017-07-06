@@ -18,6 +18,7 @@ protected:
 	Matrix Mat;
 	paralution::BiCGStab<Matrix,Vector,double> bicgstab;
 	void SolveBiCGStab();
+	void SolveBiCGStab_ILUT();
 	void SolveBiCGStab_Simple();
 	paralution::GMRES<Matrix,Vector,double> gmres;
 	void SolveGMRES();
