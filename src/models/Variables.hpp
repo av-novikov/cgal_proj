@@ -18,17 +18,23 @@ namespace var
 			static const int size = 1;
 			adouble p;
 		};
-		struct Vat2phase
+		struct AcidVar
 		{
-			static const int size = 2;
+			static const int size = 5;
+			double& m;
 			double& p;
 			double& s;
+			double& xa;
+			double& xw;
 		};
-		struct TapeVar2Phase
+		struct TapeAcidVar
 		{
-			static const int size = 2;
+			static const int size = 5;
+			adouble m;
 			adouble p;
 			adouble s;
+			adouble xa;
+			adouble xw;
 		};
 	};
 
