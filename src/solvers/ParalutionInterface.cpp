@@ -87,12 +87,12 @@ void ParSolver::SolveBiCGStab()
 {
 	bicgstab.SetOperator(Mat);
 	//p.Set(1.E-15, 100);
-	p.Set(6);
+	p.Set(4);
 	bicgstab.SetPreconditioner(p);
 	bicgstab.Build();
 	isAssembled = true;
 
-	bicgstab.Init(1.E-22, 1.E-15, 1E+12, 1000);
+	bicgstab.Init(1.E-18, 1.E-8, 1E+12, 1000);
 	Mat.info();
 
 	//bicgstab.RecordResidualHistory();

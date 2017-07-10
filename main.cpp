@@ -17,9 +17,9 @@ oil2d::Properties* getProps()
 
 	props->leftBoundIsRate = true;
 	props->rightBoundIsPres = true;
-	props->rates.push_back(100.0);
-	props->ht = 10.0;
-	props->ht_min = 10.0;
+	props->rates.push_back(1000.0);
+	props->ht = 1000.0;
+	props->ht_min = 1000.0;
 	props->ht_max  = 100000.0;
 
 	props->perfIntervals.push_back( make_pair(0, 0) );
@@ -31,7 +31,7 @@ oil2d::Properties* getProps()
 	tmp.m = 0.1;
 	tmp.p_init = tmp.p_out = 200.0 * 100000.0;
 	tmp.height = 10.0;
-	tmp.kx = tmp.ky = 50.0;
+	tmp.kx = tmp.ky = 10.0;
 	tmp.dens_stc = 2000.0;
 	tmp.beta = 0.0 * 1.0e-10;
 	props->props_sk.push_back( tmp );
@@ -60,10 +60,10 @@ Task* getMeshTask(const double x_dim)
 	//Task::Body::Border body2border = { { 3, 3 },{ 9, 3 },{ 9, -3 },{ 3, -3 } };
 	task->bodies = { Task::Body({ 0, body1border,{} }) };
 
-	const double w = 0.1 / x_dim;
-	Point pt1 = { -50 / x_dim, -100 / x_dim };			Point pt2 = { -150 / x_dim, 50 / x_dim };
-	Point pt3 = pt2;		pt3[0] += w;
-	Point pt4 = pt1;		pt4[0] += w;
+	const double w = 0.01 / x_dim;
+	Point pt1 = { -100 / x_dim, w / 2.0 / x_dim };			Point pt2 = { 100 / x_dim, w / 2.0 / x_dim };
+	Point pt3 = pt2;		pt3[1] -= w;
+	Point pt4 = pt1;		pt4[1] -= w;
 
 	const int SIZE = 1;
 	double dx = (pt2[0] - pt1[0]) / (double)SIZE;

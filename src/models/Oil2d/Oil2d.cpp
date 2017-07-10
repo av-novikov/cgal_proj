@@ -100,7 +100,7 @@ void Oil2d::makeDimLess()
 void Oil2d::setPerforated()
 {
 	// Well locating & preparing
-	Qcell[0] = 0.0;
+	Qcell[mesh->well_idx] = 0.0;
 
 	x = new TapeVariable[cellsNum];
 	h = new adouble[var_size * cellsNum];
@@ -113,7 +113,7 @@ void Oil2d::setInitialState()
 		const auto& cell = mesh->cells[i];
 		auto data = (*this)[i];
 		if(cell.type == CellType::FRAC)
-			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init * 0.95;
+			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init * 0.99;
 		else
 			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init;
 	}
