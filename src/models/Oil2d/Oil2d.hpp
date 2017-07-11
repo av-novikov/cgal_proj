@@ -7,14 +7,11 @@
 
 namespace oil2d
 {
-	const int stencil = 4;
-
-	class Oil2d : public AbstractModel<var::containers::Var1phase, oil2d::Properties, var::BasicVariables, Oil2d>
+	typedef var::containers::TapeVar1Phase TapeVariable;
+	class Oil2d : public AbstractModel<var::containers::Var1phase, Properties, var::BasicVariables, Oil2d>
 	{
 		template<typename> friend class VTKSnapshotter;
 		friend class Oil2dSolver;
-	public:
-		typedef var::containers::TapeVar1Phase TapeVariable;
 	protected:
 		void setProps(const Properties& props);
 		void makeDimLess();

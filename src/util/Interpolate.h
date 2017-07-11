@@ -8,15 +8,15 @@ class Interpolate
 {
 	public:
 	Interpolate();
-	Interpolate(double *ptx, double *pty, int N);
-	Interpolate(double *ptx, double *pty, double *dpty, int N);
-	Interpolate(double *ptx, double *pty, double *dpty,double *d2pty, int N);
+	Interpolate(const double *ptx, const double *pty, const size_t N);
+	Interpolate(const double *ptx, const double *pty, const double *dpty, const size_t N);
+	Interpolate(const double *ptx, const double *pty, const double *dpty,const double *d2pty, const size_t N);
 	~Interpolate();
 	
-	double Solve(double arg);
+	double Solve(const double arg);
 	adouble Solve(adouble arg);
-	double DSolve(double arg);
-	double D2Solve(double arg);
+	double DSolve(const double arg);
+	double D2Solve(const double arg);
 	
 	double *x;
 	double *y;

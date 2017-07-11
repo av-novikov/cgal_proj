@@ -1,22 +1,36 @@
-#include "model/Acid/2d/Acid2dSolver.hpp"
+#include "src/models/Acid/Acid2dSolver.hpp"
 
-#include <map>
+#include "adolc/sparse/sparsedrivers.h"
+#include "adolc/drivers/drivers.h"
+#include <iomanip>
 
-using namespace std;
 using namespace acid2d;
+using std::vector;
+using std::ofstream;
+using std::endl;
+using std::map;
+using std::setprecision;
 
-Acid2dSolver::Acid2dSolver(Acid2d* _model) : basic2d::Basic2dSolver<Acid2d>(_model)
+Acid2dSolver::Acid2dSolver(Acid2d* _model) : AbstractSolver<Model>(_model)
 {
-	//P.open("snaps/P.dat", ofstream::out);
-	//S.open("snaps/S.dat", ofstream::out);
-	//qcells.open("snaps/q_cells.dat", ofstream::out);
-	const int strNum = var_size * model->cellsNum;
-	ind_i = new int[stencil * var_size * strNum];
-	ind_j = new int[stencil * var_size * strNum];
+	y = new double[var_size * size];
+
+	const size_t strNum = var_size * model->cellsNum;
+	ind_i = new int[mesh::stencil * var_size * strNum];
+	ind_j = new int[mesh::stencil * var_size * strNum];
 	cols = new int[strNum];
-	a = new double[stencil * var_size * strNum];
+	a = new double[mesh::stencil * var_size * strNum];
 	ind_rhs = new int[strNum];
 	rhs = new double[strNum];
+
+	options[0] = 0;          /* sparsity pattern by index domains (default) */
+	options[1] = 0;          /*                         safe mode (default) */
+	options[2] = 0;          /*              not required if options[0] = 0 */
+	options[3] = 0;          /*                column compression (default) */
+
+	P.open("snaps/P.dat", ofstream::out);
+	S.open("snaps/S.dat", ofstream::out);
+	qcells.open("snaps/Q.dat", ofstream::out);
 
 	CHOP_MULT = 0.1;
 	MAX_SAT_CHANGE = 1.0;
@@ -26,41 +40,63 @@ Acid2dSolver::Acid2dSolver(Acid2d* _model) : basic2d::Basic2dSolver<Acid2d>(_mod
 }
 Acid2dSolver::~Acid2dSolver()
 {
-	//P.close();
-	//S.close();
-	//qcells.close();
-
+	delete[] y;
 	delete[] ind_i, ind_j, ind_rhs;
 	delete[] cols;
 	delete[] a, rhs;
+
+	P.close();
+	S.close();
+	qcells.close();
 }
 void Acid2dSolver::writeData()
 {
-/*	double p = 0.0, s_w = 0.0, s_o = 0.0;
+	double p = 0.0, s = 0.0, q = 0.0;
 
 	qcells << cur_t * t_dim / 3600.0;
 
-	map<int, double>::iterator it;
+	map<size_t, double>::iterator it;
 	for (it = model->Qcell.begin(); it != model->Qcell.end(); ++it)
 	{
-		p += model->cells[it->first].u_next.p * model->P_dim;
-		s_w += model->cells[it->first].u_next.s_w;
-		s_o += model->cells[it->first].u_next.s_o;
+		const auto data = (*model)[it->first].u_next;
+		p += data.p * model->P_dim;
+		s += data.s;
 		if (model->leftBoundIsRate)
 			qcells << "\t" << it->second * model->Q_dim * 86400.0;
 		else
+		{
 			qcells << "\t" << model->getRate(it->first) * model->Q_dim * 86400.0;
+			q += model->getRate(it->first);
+		}
+	}
+	P << cur_t * t_dim / 3600.0 << "\t" << p / (double)(model->Qcell.size()) << endl;
+	S << cur_t * t_dim / 3600.0 << "\t" << s / (double)(model->Qcell.size()) << endl;
+
+	if (model->leftBoundIsRate)
+		qcells << "\t" << model->Q_sum * model->Q_dim * 86400.0 << endl;
+	else
+		qcells << "\t" << q * model->Q_dim * 86400.0 << endl;
+}
+void Acid2dSolver::control()
+{
+	writeData();
+
+	if (cur_t >= model->period[curTimePeriod])
+	{
+		curTimePeriod++;
+		model->ht = model->ht_min;
+		model->setPeriod(curTimePeriod);
 	}
 
-	P << cur_t * t_dim / 3600.0 <<
-		"\t" << p / (double)(model->Qcell.size()) << endl;
-	S << cur_t * t_dim / 3600.0 <<
-		"\t" << s_w / (double)(model->Qcell.size()) <<
-		"\t" << s_o / (double)(model->Qcell.size()) <<
-		"\t" << 1.0 - (s_w + s_o) / (double)(model->Qcell.size()) << endl;
+	if (model->ht <= model->ht_max && iterations < 6)
+		model->ht = model->ht * 1.5;
+	else if (iterations > 6 && model->ht > model->ht_min)
+		model->ht = model->ht / 1.5;
 
-	qcells << endl;
-	*/
+	if (cur_t + model->ht > model->period[curTimePeriod])
+		model->ht = model->period[curTimePeriod] - cur_t;
+
+	cur_t += model->ht;
 }
 void Acid2dSolver::start()
 {
@@ -75,46 +111,30 @@ void Acid2dSolver::start()
 	while (cur_t < Tt)
 	{
 		control();
-		if (model->isWriteSnaps)
-			model->snapshot_all(counter++);
+		model->snapshot_all(counter++);
 		doNextStep();
 		copyTimeLayer();
 		cout << "---------------------NEW TIME STEP---------------------" << endl;
+		cout << setprecision(6);
+		cout << "time = " << cur_t << endl;
 	}
-	if (model->isWriteSnaps)
-		model->snapshot_all(counter++);
+	model->snapshot_all(counter++);
 	writeData();
 }
-void Acid2dSolver::copySolution(const Vector& sol)
+void Acid2dSolver::copySolution(const paralution::LocalVector<double>& sol)
 {
-	for (int i = 0; i < model->cellsNum; i++)
-		for(int j = 0; j < var_size; j++)
-			model->cells[i].u_next.values[j] += sol[i * var_size + j];
+	for (size_t i = 0; i < size; i++)
+	{
+		auto& var = (*model)[i].u_next;
+		var.m += sol[i * var_size];
+		var.p += sol[i * var_size + 1];
+		var.s += sol[i * var_size + 2];
+		var.xa += sol[i * var_size + 3];
+		var.xw += sol[i * var_size + 4];
+	}
 }
-
 void Acid2dSolver::checkStability()
 {
-	auto checkBubPoint = [](auto& cell, auto& next)
-	{
-		if (next.SATUR)
-		{
-			if (next.so + next.sw > 1.0 + EQUALITY_TOLERANCE)
-			{
-				next.SATUR = false;
-				next.so = 1.0 - next.sw;
-				next.p_bub = 0.999 * cell.u_iter.p_bub;
-			}
-		}
-		else
-		{
-			if (next.p_bub > next.p + EQUALITY_TOLERANCE)
-			{
-				next.SATUR = true;
-				next.so = 0.999 * cell.u_iter.so;
-				next.p_bub = next.p;
-			}
-		}
-	};
 	auto barelyMobilLeft = [this](double s_cur, double s_crit) -> double
 	{
 		return s_crit + fabs(s_cur - s_crit) * CHOP_MULT;
@@ -126,44 +146,27 @@ void Acid2dSolver::checkStability()
 	auto checkCritPoints = [=, this](auto& next, auto& iter, auto& props)
 	{
 		// Oil
-		if ((next.so - props.s_oc) * (iter.so - props.s_oc) < 0.0)
-			next.so = barelyMobilLeft(next.so, props.s_oc);
-		if ((next.so - (1.0 - props.s_wc - props.s_gc)) * (iter.so - (1.0 - props.s_wc - props.s_gc)) < 0.0)
-			next.so = barelyMobilRight(next.so, 1.0 - props.s_wc - props.s_gc);
+		if ((1.0 - next.s - props.s_oc) * (1.0 - iter.s - props.s_oc) < 0.0)
+			next.s = 1.0 - barelyMobilLeft(1.0 - next.s, props.s_oc);
+		if ((1.0 - next.s - (1.0 - props.s_wc)) * (1.0 - iter.s - (1.0 - props.s_wc)) < 0.0)
+			next.s = 1.0 - barelyMobilRight(1.0 - next.s, 1.0 - props.s_wc);
 		// Water
-		if ((next.sw - props.s_wc) * (iter.sw - props.s_wc) < 0.0)
-			next.sw = barelyMobilLeft(next.sw, props.s_wc);
-		if ((next.sw - (1.0 - props.s_oc - props.s_gc)) * (iter.sw - (1.0 - props.s_oc - props.s_gc)) < 0.0)
-			next.sw = barelyMobilRight(next.sw, 1.0 - props.s_oc - props.s_gc);
-		// Gas
-		if ((1.0 - next.sw - next.so - props.s_gc) * (1.0 - iter.sw - iter.so - props.s_gc) < 0.0)
-			if (fabs(next.so - iter.so) > fabs(next.sw - iter.sw))
-				next.so = 1.0 - next.sw - barelyMobilLeft(1.0 - next.so - next.sw, props.s_gc);
-			else
-				next.sw = 1.0 - next.so - barelyMobilLeft(1.0 - next.so - next.sw, props.s_gc);
-		if ((props.s_wc - next.sw + props.s_oc - next.so) * (props.s_wc - iter.sw + props.s_oc - iter.so) < 0.0)
-			if (fabs(next.so - iter.so) > fabs(next.sw - iter.sw))
-				next.so = 1.0 - next.sw - barelyMobilRight(1.0 - next.so - next.sw, 1.0 - props.s_oc - props.s_wc);
-			else
-				next.sw = 1.0 - next.so - barelyMobilRight(1.0 - next.so - next.sw, 1.0 - props.s_oc - props.s_wc);
+		if ((next.s - props.s_wc) * (iter.s - props.s_wc) < 0.0)
+			next.s = barelyMobilLeft(next.s, props.s_wc);
+		if ((next.s - (1.0 - props.s_oc)) * (iter.s - (1.0 - props.s_oc)) < 0.0)
+			next.s = barelyMobilRight(next.s, 1.0 - props.s_oc);
 	};
 	auto checkMaxResidual = [=, this](auto& next, auto& iter)
 	{
-		if (fabs(next.sw - iter.sw) > MAX_SAT_CHANGE)
-			next.sw = iter.sw + sign(next.sw - iter.sw) * MAX_SAT_CHANGE;
-		if (fabs(next.so - iter.so) > MAX_SAT_CHANGE)
-			next.so = iter.so + sign(next.so - iter.so) * MAX_SAT_CHANGE;
+		if (fabs(next.s - iter.s) > MAX_SAT_CHANGE)
+			next.s = iter.s + sign(next.s - iter.s) * MAX_SAT_CHANGE;
 	};
 
-	for (auto& cell : model->cells)
+	for (size_t i = 0; i < size; i++)
 	{
-		const Skeleton_Props& props = *cell.props;
-		Variable& next = cell.u_next;
-		const Variable& iter = cell.u_iter;
-
-		checkBubPoint(cell, next);
-		checkCritPoints(next, iter, props);
-		checkMaxResidual(next, iter);
+		auto& data = (*model)[i];
+		checkCritPoints(data.u_next, data.u_iter, model->props_sk[0]);
+		checkMaxResidual(data.u_next, data.u_iter);
 	}
 }
 void Acid2dSolver::solveStep()
@@ -188,14 +191,11 @@ void Acid2dSolver::solveStep()
 	{
 		copyIterLayer();
 
-		//fill();
-		//solver.Assemble(ind_i, ind_j, a, elemNum, ind_rhs, rhs);
-		//solver.Solve(PRECOND::ILU_SIMPLE);
-		//copySolution(solver.getSolution());
-
-		//writeMatrixes();
-		Solve(model->cellsNum_r + 1, var_size * (model->cellsNum_z + 2), PRES);
-		construction_from_fz(model->cellsNum_r + 2, var_size * (model->cellsNum_z + 2), PRES);
+		computeJac();
+		fill();
+		solver.Assemble(ind_i, ind_j, a, elemNum, ind_rhs, rhs);
+		solver.Solve(PRECOND::ILU_SERIOUS);
+		copySolution(solver.getSolution());
 
 		checkStability();
 		err_newton = convergance(cellIdx, varIdx);
@@ -211,387 +211,68 @@ void Acid2dSolver::solveStep()
 	cout << "Newton Iterations = " << iterations << endl;
 }
 
-void Acid2dSolver::fillIndices()
+void Acid2dSolver::computeJac()
 {
-	int pres_counter = 0, temp_counter = 0;
-	int col_idx = 0;
+	trace_on(0);
 
-	for (const auto& cell : model->cells)
+	for (size_t i = 0; i < size; i++)
 	{
-		cols[col_idx] = 0;
-		auto& pres_idx = getMatrixStencil(cell);
+		model->x[i].m <<= model->u_next[var_size * i];
+		model->x[i].p <<= model->u_next[var_size * i + 1];
+		model->x[i].s <<= model->u_next[var_size * i + 2];
+		model->x[i].xa <<= model->u_next[var_size * i + 3];
+		model->x[i].xw <<= model->u_next[var_size * i + 4];
+	}
+	// Inner cells
+	for (size_t i = 0; i < mesh->inner_cells; i++)
+	{
+		const auto& cell = mesh->cells[i];
+		TapeVariable tmp = model->solveInner(cell);
+		model->h[var_size * i] = cell.V * tmp.m;
+		model->h[var_size * i + 1] = cell.V * tmp.p;
+		model->h[var_size * i + 2] = cell.V * tmp.s;
+		model->h[var_size * i + 3] = cell.V * tmp.xa;
+		model->h[var_size * i + 4] = cell.V * tmp.xw;
+	}
+	// Border cells
+	for (size_t i = mesh->border_beg; i < model->cellsNum; i++)
+	{
+		const auto& cell = mesh->cells[i];
+		TapeVariable tmp = model->solveBorder(cell);
+		model->h[var_size * i] = tmp.m;
+		model->h[var_size * i + 1] = tmp.p;
+		model->h[var_size * i + 2] = tmp.s;
+		model->h[var_size * i + 3] = tmp.xa;
+		model->h[var_size * i + 4] = tmp.xw;
+	}
+	// Well cell
+	const int well_idx = mesh->well_idx;
+	TapeVariable& cur = model->x[well_idx];
+	model->h[well_idx * var_size + 1] = (cur.s - (1.0 - model->props_sk[0].s_oc)) / model->P_dim;
+	model->h[well_idx * var_size + 2] += mesh->cells[well_idx].V * model->ht * model->props_w.getDensity(cur.p, cur.xa, cur.xw) * model->Q_sum;
+	model->h[well_idx * var_size + 3] = (cur.xa - model->xa) / model->P_dim;
+	model->h[well_idx * var_size + 4] = (cur.xw - (1.0 - model->xa)) / model->P_dim;
 
-		for (int i = 0; i < var_size; i++)
-		{
-			const int str_idx = var_size * cell.num + i;
-			for (const int idx : pres_idx)
-			{
-				for (int j = 0; j < var_size; j++)
-				{
-					ind_i[pres_counter] = str_idx;			ind_j[pres_counter++] = var_size * idx + j;
-				}
-			}
-		}
-
-		cols[col_idx++] += var_size * pres_idx.size();
-		pres_idx.clear();
+	for (size_t i = 0; i < size; i++)
+	{
+		for (size_t j = 0; j < var_size; j++)
+			model->h[var_size * i + j] >>= y[var_size * i + j];
 	}
 
-	elemNum = pres_counter;
-
-	for (int i = 0; i < model->cellsNum * var_size; i++)
-		ind_rhs[i] = i;
+	trace_off();
 }
 void Acid2dSolver::fill()
 {
+	sparse_jac(0, var_size * model->cellsNum, var_size * model->cellsNum, repeat,
+		&model->u_next[0], &elemNum, (unsigned int**)(&ind_i), (unsigned int**)(&ind_j), &a, options);
+
 	int counter = 0;
-	int nebr_idx;
-
-	for (const auto& cell : model->cells)
+	for (const auto& cell : mesh->cells)
 	{
-		model->setVariables(cell);
-
-		auto& mat_idx = getMatrixStencil(cell);
-		for (int i = 0; i < var_size; i++)
+		for (size_t i = 0; i < var_size; i++)
 		{
-			const int str_idx = var_size * cell.num + i;
-			nebr_idx = 0;
-			for (const int idx : mat_idx)
-			{
-				for (int j = 0; j < var_size; j++)
-					a[counter++] = model->jac[i][var_size * nebr_idx + j];
-
-				nebr_idx++;
-			}
-
-			rhs[str_idx] = -model->y[i];
-		}
-		mat_idx.clear();
-	}
-
-}
-
-void Acid2dSolver::construction_from_fz(int N, int n, int key)
-{
-	vector<Cell>::iterator it;
-	if (key == PRES)
-	{
-		for (int i = 0; i < N; i++)
-		{
-			for (int j = 0; j < model->cellsNum_z + 2; j++)
-			{
-				Variable& next = model->cells[i*(model->cellsNum_z + 2) + j].u_next;
-
-				next.m += fz[i][var_size * j + 1];
-				next.p += fz[i][var_size * j + 2];
-				next.sw += fz[i][var_size * j + 3];
-				next.xa += fz[i][var_size * j + 4];
-				next.xw += fz[i][var_size * j + 5];
-				if (next.SATUR)
-				{
-					next.so += fz[i][var_size * j + 6];
-					next.p_bub = next.p;
-				}
-				else
-				{
-					next.so -= fz[i][var_size * j + 3];
-					next.p_bub += fz[i][var_size * j + 6];
-				}
-			}
+			const int str_idx = var_size * cell.id + i;
+			rhs[str_idx] = -y[str_idx];
 		}
 	}
 }
-void Acid2dSolver::MiddleAppr(int current, int MZ, int key)
-{
-	for (int i = 0; i < MZ; i++)
-	{
-		for (int j = 0; j < MZ; j++)
-		{
-			A[i][j] = 0.0;
-			B[i][j] = 0.0;
-			C[i][j] = 0.0;
-		}
-		RightSide[i][0] = 0.0;
-	}
-
-	if (key == PRES)
-	{
-		int idx = 0;
-		int cell_idx = current * (model->cellsNum_z + 2);
-
-		// Top cell
-		model->setVariables(model->cells[cell_idx]);
-
-		for (int i = 0; i < var_size; i++)
-		{
-			RightSide[idx + i][0] = -model->y[i];
-
-			for (int j = 0; j < var_size - 1; j++)
-			{
-					B[idx + i][idx + j] = model->jac[i][j];
-					B[idx + i][idx + j + var_size] = model->jac[i][j + size];
-			}
-
-			// so / p_bub
-			if (model->cells[cell_idx].u_next.SATUR)
-				B[idx + i][idx + var_size - 1] = model->jac[i][var_size - 1];
-			else
-				B[idx + i][idx + var_size - 1] = model->jac[i][var_size];
-			if (model->cells[cell_idx + 1].u_next.SATUR)
-				B[idx + i][idx + var_size - 1 + var_size] = model->jac[i][size + var_size - 1];
-			else
-				B[idx + i][idx + var_size - 1 + var_size] = model->jac[i][size + var_size];
-
-		}
-		idx += var_size;
-
-		// Middle cells
-		for (cell_idx = current * (model->cellsNum_z + 2) + 1; cell_idx < (current + 1) * (model->cellsNum_z + 2) - 1; cell_idx++)
-		{
-			model->setVariables(model->cells[cell_idx]);
-
-			for (int i = 0; i < var_size; i++)
-			{
-				RightSide[idx + i][0] = -model->y[i];
-
-				for (int j = 0; j < var_size - 1; j++)
-				{
-						B[idx + i][idx + j] = model->jac[i][j];
-						C[idx + i][idx + j] = model->jac[i][j + size];
-						A[idx + i][idx + j] = model->jac[i][j + size * 2];
-						B[idx + i][idx + j - var_size] = model->jac[i][j + size * 3];
-						B[idx + i][idx + j + var_size] = model->jac[i][j + size * 4];
-				}
-
-				// so / p_bub
-				if (model->cells[cell_idx].u_next.SATUR)
-					B[idx + i][idx + var_size - 1] = model->jac[i][var_size - 1];
-				else
-					B[idx + i][idx + var_size - 1] = model->jac[i][var_size];
-				if (model->cells[cell_idx - model->cellsNum_z - 2].u_next.SATUR)
-					C[idx + i][idx + var_size - 1] = model->jac[i][size + var_size - 1];
-				else
-					C[idx + i][idx + var_size - 1] = model->jac[i][size + var_size];
-				if (model->cells[cell_idx + model->cellsNum_z + 2].u_next.SATUR)
-					A[idx + i][idx + var_size - 1] = model->jac[i][size * 2 + var_size - 1];
-				else
-					A[idx + i][idx + var_size - 1] = model->jac[i][size * 2 + var_size];
-				if (model->cells[cell_idx - 1].u_next.SATUR)
-					B[idx + i][idx + var_size - 1 - var_size] = model->jac[i][size * 3 + var_size - 1];
-				else
-					B[idx + i][idx + var_size - 1 - var_size] = model->jac[i][size * 3 + var_size];
-				if (model->cells[cell_idx + 1].u_next.SATUR)
-					B[idx + i][idx + var_size - 1 + var_size] = model->jac[i][size * 4 + var_size - 1];
-				else
-					B[idx + i][idx + var_size - 1 + var_size] = model->jac[i][size * 4 + var_size];
-			}
-
-			idx += var_size;
-		}
-
-		// Bottom cell
-		model->setVariables(model->cells[cell_idx]);
-
-		for (int i = 0; i < var_size; i++)
-		{
-			RightSide[idx + i][0] = -model->y[i];
-
-			for (int j = 0; j < var_size - 1; j++)
-			{
-				B[idx + i][idx + j] = model->jac[i][j];
-				B[idx + i][idx + j - var_size] = model->jac[i][j + size];
-			}
-
-			// so / p_bub
-			if (model->cells[cell_idx].u_next.SATUR)
-				B[idx + i][idx + var_size - 1] = model->jac[i][var_size - 1];
-			else
-				B[idx + i][idx + var_size - 1] = model->jac[i][var_size];
-			if (model->cells[cell_idx + 1].u_next.SATUR)
-				B[idx + i][idx + var_size - 1 - var_size] = model->jac[i][size + var_size - 1];
-			else
-				B[idx + i][idx + var_size - 1 - var_size] = model->jac[i][size + var_size];
-		}
-	}
-
-	construction_bz(MZ, 2);
-}
-void Acid2dSolver::LeftBoundAppr(int MZ, int key)
-{
-	for (int i = 0; i < MZ; i++)
-	{
-		for (int j = 0; j < MZ; j++)
-		{
-			C[i][j] = 0.0;
-			B[i][j] = 0.0;
-			A[i][j] = 0.0;
-		}
-		C[i][i] = 1.0;
-		B[i][i] = -1.0;
-
-		const Variable& next = model->cells[int(i / var_size)].u_next;
-		const Variable& nebr = model->cells[int(i / var_size) + model->cellsNum_z + 2].u_next;
-		RightSide[i][0] = -next.values[i % var_size] + nebr.values[i % var_size];
-		
-		if (i % var_size == var_size - 1)
-			RightSide[i][0] = -next.values[var_size - 1 + !next.SATUR] + nebr.values[var_size - 1 + !nebr.SATUR];
-		else
-			RightSide[i][0] = -next.values[i % var_size] + nebr.values[i % var_size];
-	}
-
-	map<int, double>::iterator it;
-	int idx;
-	if (key == PRES)
-	{
-		for (it = model->Qcell.begin(); it != model->Qcell.end(); ++it)
-		{
-			idx = var_size * it->first;
-			model->setVariables(model->cells[it->first]);
-
-			for (int i = 0; i < var_size; i++)
-			{
-				RightSide[idx + i][0] = -model->y[i];
-
-				for (int j = 0; j < var_size - 1; j++)
-				{
-					C[idx + i][idx + j] = model->jac[i][j];
-					B[idx + i][idx + j] = model->jac[i][j + size];
-					A[idx + i][idx + j] = model->jac[i][j + 2 * size];
-				}
-
-				// s_o / p_bub
-				if (model->cells[it->first].u_next.SATUR)
-					C[idx + i][idx + var_size - 1] = model->jac[i][var_size - 1];
-				else
-					C[idx + i][idx + var_size - 1] = model->jac[i][var_size];
-				if (model->cells[it->first + model->cellsNum_z + 2].u_next.SATUR)
-					B[idx + i][idx + var_size - 1] = model->jac[i][size + var_size - 1];
-				else
-					B[idx + i][idx + var_size - 1] = model->jac[i][size + var_size];
-				if (model->cells[it->first + 2 * model->cellsNum_z + 4].u_next.SATUR)
-					A[idx + i][idx + var_size - 1] = model->jac[i][2 * size + var_size - 1];
-				else
-					A[idx + i][idx + var_size - 1] = model->jac[i][2 * size + var_size];
-			}
-		}
-	}
-
-	construction_bz(MZ, 2);
-}
-void Acid2dSolver::RightBoundAppr(int MZ, int key)
-{
-	for (int i = 0; i < MZ; i++)
-	{
-		for (int j = 0; j < MZ; j++)
-		{
-			C[i][j] = 0.0;
-			B[i][j] = 0.0;
-			A[i][j] = 0.0;
-		}
-		RightSide[i][0] = 0.0;
-	}
-
-	if (key == PRES)
-	{
-		int idx = 0;
-
-		for (int cell_idx = (model->cellsNum_r + 1)*(model->cellsNum_z + 2); cell_idx < (model->cellsNum_r + 2)*(model->cellsNum_z + 2); cell_idx++)
-		{
-			model->setVariables(model->cells[cell_idx]);
-
-			for (int i = 0; i < var_size; i++)
-			{
-				RightSide[idx + i][0] = -model->y[i];
-
-				for (int j = 0; j < var_size - 1; j++)
-				{
-					A[idx + i][idx + j] = model->jac[i][j];
-					B[idx + i][idx + j] = model->jac[i][j + size];
-				}
-
-				// s_o / p_bub
-				if (model->cells[cell_idx].u_next.SATUR)
-					A[idx + i][idx + var_size - 1] = model->jac[i][var_size - 1];
-				else
-					A[idx + i][idx + var_size - 1] = model->jac[i][var_size];
-				if (model->cells[cell_idx - model->cellsNum_z - 2].u_next.SATUR)
-					B[idx + i][idx + var_size - 1] = model->jac[i][size + var_size - 1];
-				else
-					B[idx + i][idx + var_size - 1] = model->jac[i][size + var_size];
-			}
-
-			idx += var_size;
-		}
-	}
-
-	construction_bz(MZ, 1);
-}
-void Acid2dSolver::writeMatrixes()
-{
-	const int MZ = (model->cellsNum_z + 2) * var_size;
-
-	// Left
-	mat_a.open("snaps/a_left.dat", ofstream::out);
-	mat_b.open("snaps/b_left.dat", ofstream::out);
-	mat_c.open("snaps/c_left.dat", ofstream::out);
-	rhs_os.open("snaps/rhs_left.dat", ofstream::out);
-
-	LeftBoundAppr(MZ, PRES);
-	for (int i = 0; i < MZ; i++)
-	{
-		for (int j = 0; j < MZ; j++)
-		{
-			mat_a << i << "\t" << j << "\t" << A[i][j] << endl;
-			mat_b << i << "\t" << j << "\t" << B[i][j] << endl;
-			mat_c << i << "\t" << j << "\t" << C[i][j] << endl;
-		}
-		rhs_os << i << "\t" << RightSide[i][0] << endl;
-	}
-	mat_a.close();		mat_b.close();		mat_c.close();		rhs_os.close();
-
-	// Middle
-	for (int k = 0; k < model->cellsNum_r; k++)
-	{
-		const string afilename = "snaps/a_" + to_string(k + 1) + ".dat";
-		const string bfilename = "snaps/b_" + to_string(k + 1) + ".dat";
-		const string cfilename = "snaps/c_" + to_string(k + 1) + ".dat";
-		const string rhsfilename = "snaps/rhs_" + to_string(k + 1) + ".dat";
-		mat_a.open(afilename.c_str(), ofstream::out);
-		mat_b.open(bfilename.c_str(), ofstream::out);
-		mat_c.open(cfilename.c_str(), ofstream::out);
-		rhs_os.open(rhsfilename.c_str(), ofstream::out);
-
-		MiddleAppr(k + 1, MZ, PRES);
-		for (int i = 0; i < MZ; i++)
-		{
-			for (int j = 0; j < MZ; j++)
-			{
-				mat_a << i << "\t" << j << "\t" << A[i][j] << endl;
-				mat_b << i << "\t" << j << "\t" << B[i][j] << endl;
-				mat_c << i << "\t" << j << "\t" << C[i][j] << endl;
-			}
-			rhs_os << i << "\t" << RightSide[i][0] << endl;
-		}
-
-		mat_a.close();		mat_b.close();		mat_c.close();		rhs_os.close();
-	}
-
-	// Right
-	mat_a.open("snaps/a_right.dat", ofstream::out);
-	mat_b.open("snaps/b_right.dat", ofstream::out);
-	mat_c.open("snaps/c_right.dat", ofstream::out);
-	rhs_os.open("snaps/rhs_right.dat", ofstream::out);
-
-	RightBoundAppr(MZ, PRES);
-	for (int i = 0; i < MZ; i++)
-	{
-		for (int j = 0; j < MZ; j++)
-		{
-			mat_a << i << "\t" << j << "\t" << A[i][j] << endl;
-			mat_b << i << "\t" << j << "\t" << B[i][j] << endl;
-			mat_c << i << "\t" << j << "\t" << C[i][j] << endl;
-		}
-		rhs_os << i << "\t" << RightSide[i][0] << endl;
-	}
-	mat_a.close();		mat_b.close();		mat_c.close();		rhs_os.close();
-};

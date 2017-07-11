@@ -4,12 +4,10 @@
 Interpolate::Interpolate()
 {
 }
-
 Interpolate::~Interpolate()
 {
 }
-
-Interpolate::Interpolate(double *ptx, double *pty, int _N)
+Interpolate::Interpolate(const double *ptx, const double *pty, const size_t _N)
 {
 	Nf = 1000000;
 	Flag = new int[Nf+1];
@@ -17,7 +15,8 @@ Interpolate::Interpolate(double *ptx, double *pty, int _N)
 	x = new double[N];
 	y = new double[N];
 
-	for (int i= 0; i < N; i++){
+	for (size_t i = 0; i < N; i++)
+	{
 		x[i] = ptx[i];
 		y[i] = pty[i];
 	}
@@ -34,8 +33,7 @@ Interpolate::Interpolate(double *ptx, double *pty, int _N)
 	IsSetDiff = false;
 
 }
-
-Interpolate::Interpolate(double *ptx, double *pty, double *dpty, int N)
+Interpolate::Interpolate(const double *ptx, const double *pty, const double *dpty, const size_t N)
 {
 	Nf = 10000;
 	Flag = new int[Nf+1];
@@ -57,8 +55,7 @@ Interpolate::Interpolate(double *ptx, double *pty, double *dpty, int N)
 	IsSetDiff = true;
 
 }
-
-Interpolate::Interpolate(double *ptx, double *pty, double *dpty, double *d2pty, int N)
+Interpolate::Interpolate(const double *ptx, const double *pty, const double *dpty, const double *d2pty, const size_t N)
 {
 	Nf = 10000;
 	Flag = new int[Nf+1];
@@ -83,7 +80,6 @@ Interpolate::Interpolate(double *ptx, double *pty, double *dpty, double *d2pty, 
 	IsSetDiff = true;
 	IsSetDiff2 = true;
 }
-
 double Interpolate::Solve(double arg)
 {
 	if (arg < xmin ) 
@@ -97,7 +93,6 @@ double Interpolate::Solve(double arg)
 	
 	return (arg - x[Flag[index]])/dx*dy + y[Flag[index]];
 }
-
 adouble Interpolate::Solve(adouble arg)
 {
 	double tmp = arg.value();
@@ -109,8 +104,7 @@ adouble Interpolate::Solve(adouble arg)
 	int i = Flag[int((tmp - xmin) / temp)];
 	return (adouble)(DSolve(tmp)) * (arg - (adouble)(x[i])) + (adouble)y[i];
 }
-
-double Interpolate::DSolve(double arg)
+double Interpolate::DSolve(const double arg)
 {
 	double result;
 	double dx;
@@ -137,8 +131,7 @@ double Interpolate::DSolve(double arg)
 
 	return result;
 }
-
-double Interpolate::D2Solve(double arg)
+double Interpolate::D2Solve(const double arg)
 {
 	double result;
 	double dx;
@@ -160,5 +153,4 @@ double Interpolate::D2Solve(double arg)
 		result = 0;
 	
 	return result;
-
 }

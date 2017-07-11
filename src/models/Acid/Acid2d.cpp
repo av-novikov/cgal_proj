@@ -17,7 +17,7 @@ Acid2d::~Acid2d()
 {
 	delete[] x, h;
 }
-void Acid2d::setProps(Properties& props)
+void Acid2d::setProps(const Properties& props)
 {
 	R_dim = props.R_dim;
 	r_w = props.r_w;
@@ -30,14 +30,14 @@ void Acid2d::setProps(Properties& props)
 
 	props_sk = props.props_sk;
 	skeletonsNum = props.props_sk.size();
-	for (int j = 0; j < skeletonsNum; j++)
+	for (size_t j = 0; j < skeletonsNum; j++)
 	{
 		props_sk[j].kx = MilliDarcyToM2(props_sk[j].kx);
 		props_sk[j].ky = MilliDarcyToM2(props_sk[j].ky);
 	}
 
 	periodsNum = props.timePeriods.size();
-	for (int i = 0; i < periodsNum; i++)
+	for (size_t i = 0; i < periodsNum; i++)
 	{
 		period.push_back(props.timePeriods[i]);
 		xas.push_back(props.xa[i]);
@@ -114,6 +114,7 @@ void Acid2d::makeDimLess()
 	props_o.dens_stc /= (P_dim * t_dim * t_dim / R_dim / R_dim);
 	props_o.gas_dens_stc /= (P_dim * t_dim * t_dim / R_dim / R_dim);
 	props_o.beta /= (1.0 / P_dim);
+	props_o.p_ref /= P_dim;
 
 	reac.activation_energy /= (P_dim * R_dim * R_dim * R_dim);
 	reac.surf_init /= (1.0 / R_dim);
@@ -146,11 +147,16 @@ void Acid2d::setInitialState()
 		const auto& cell = mesh->cells[i];
 		auto data = (*this)[i];
 
-		if (cell.type == CellType::FRAC)
-			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init * 0.99;
-		else
+		if (cell.type == CellType::FRAC || cell.type == CellType::WELL)
+		{
 			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init;
-		data.u_prev.m = data.u_iter.m = data.u_next.m = props.m_init;
+			data.u_prev.m = data.u_iter.m = data.u_next.m = 1.0;
+		}
+		else
+		{
+			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init;
+			data.u_prev.m = data.u_iter.m = data.u_next.m = props.m_init;
+		}
 		data.u_prev.s = data.u_iter.s = data.u_next.s = props.s_init;
 		data.u_prev.xa = data.u_iter.xa = data.u_next.xa = props.xa_init;
 		data.u_prev.xw = data.u_iter.xw = data.u_next.xw = props.xw_init;
@@ -159,7 +165,7 @@ void Acid2d::setInitialState()
 	x = new TapeVariable[cellsNum];
 	h = new adouble[var_size * cellsNum];
 }
-double Acid2d::getRate(int cur)
+double Acid2d::getRate(const size_t cur)
 {
 	return 0.0;
 };
@@ -167,149 +173,69 @@ double Acid2d::getRate(int cur)
 TapeVariable Acid2d::solveInner(const Cell& cell)
 {
 	const auto& cur = x[cell.id];
-	const auto& prev = (*this)[cell.id].u_prev;
+	const auto prev = (*this)[cell.id].u_prev;
 	const auto& props = props_sk[0];
 
-	adouble rate = getReactionRate(cur, props);
+	adouble rate = getReactionRate(cell, props);
 	TapeVariable res;
 	res.m = (1.0 - cur.m) * props.getDensity(cur.p) - (1.0 - prev.m) * props.getDensity(prev.p) -
 		ht * reac.indices[REACTS::CALCITE] * reac.comps[REACTS::CALCITE].mol_weight * rate;
-	res.p = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) -
+	res.p = cur.m * (1.0 - cur.s) * props_o.getDensity(cur.p) -
+		prev.m * (1.0 - prev.s) * props_o.getDensity(prev.p);
+	res.s = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) -
 		prev.m * prev.s * props_w.getDensity(prev.p, prev.xa, prev.xw) -
 		ht * (reac.indices[REACTS::ACID] * reac.comps[REACTS::ACID].mol_weight +
 			reac.indices[REACTS::WATER] * reac.comps[REACTS::WATER].mol_weight +
 			reac.indices[REACTS::SALT] * reac.comps[REACTS::SALT].mol_weight) * rate;
-	res.s = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) * cur.xa -
+	res.xa = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) * cur.xa -
 		prev.m * prev.s * props_w.getDensity(prev.p, prev.xa, prev.xw) * prev.xa -
 		ht * reac.indices[REACTS::ACID] * reac.comps[REACTS::ACID].mol_weight * rate;
-	res.xa = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) * cur.xw -
+	res.xw = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) * cur.xw -
 		prev.m * prev.s * props_w.getDensity(prev.p, prev.xa, prev.xw) * prev.xw -
 		ht * reac.indices[REACTS::WATER] * reac.comps[REACTS::WATER].mol_weight * rate;
-	H[4] = cur.m * cur.s * props_o.dens_stc / props_o.getB(cur.p) -
-		prev.m * prev.s * props_o.dens_stc / props_o.getB(prev.p);
 
-	for (int i = 0; i < 3; i++)
+	for (size_t i = 0; i < 3; i++)
 	{
-		const int nebr_idx = cell.nebr[i];
+		const size_t nebr_idx = cell.nebr[i];
 		const auto& beta = mesh->cells[nebr_idx];
 		const auto& nebr = x[nebr_idx];
-		const int upwd_idx = getUpwindIdx(cell.id, beta.id);
+		const size_t upwd_idx = getUpwindIdx(cell.id, beta.id);
 		TapeVariable& upwd = x[upwd_idx];
 
-		adouble dens_w = linearAppr(props_w.getDensity(cur.p, cur.xa, cur.xw), cell.dist[i], 
-									props_w.getDensity(nebr.p, nebr.xa, nebr.xw), beta.getDistance(cell.id));
-		adouble dens_o = linearAppr(props_o.getDensity(cur.p), cell.dist[i],
-									props_o.getDensity(nebr.p), beta.getDistance(cell.id));
+		adouble dens_w = linearAppr(props_w.getDensity(cur.p, cur.xa, cur.xw) / props_w.getViscosity(cur.p, cur.xa, cur.xw), 
+									cell.dist[i],
+									props_w.getDensity(nebr.p, nebr.xa, nebr.xw) / props_w.getViscosity(nebr.p, nebr.xa, nebr.xw), 
+									beta.getDistance(cell.id));
+		adouble dens_o = linearAppr(props_o.getDensity(cur.p) / props_o.getViscosity(cur.p), cell.dist[i],
+									props_o.getDensity(nebr.p) / props_o.getViscosity(nebr.p), beta.getDistance(cell.id));
 		adouble buf_w = ht / cell.V * getTrans(cell, i, beta) * (cur.p - nebr.p) *
-			dens_w * props_w.getKr(upwd.s, props) / props_w.getViscosity(upwd.p, upwd.xa, upwd.xw);
+			dens_w * props_w.getKr(upwd.s, props);
 		adouble buf_o = ht / cell.V * getTrans(cell, i, beta) * (cur.p - nebr.p) *
-			dens_o * props_o.getKr(upwd.s, props) / props_o.getViscosity(upwd.p);
+			dens_o * props_o.getKr(upwd.s, props);
 
-		h[1] += buf_w;
-		h[2] += buf_w * upwd.xa;
-		h[3] += buf_w * upwd.xw;
-		h[4] += buf_o;
+		res.p += buf_o;
+		res.s += buf_w;
+		res.xa += buf_w * upwd.xa;
+		res.xw += buf_w * upwd.xw;
 	}
 	return res;
 }
-
-void Acid2d::solve_eqMiddle(const Cell& cell)
+TapeVariable Acid2d::solveBorder(const Cell& cell)
 {
-	const Skeleton_Props& props = *cell.props;
+	const auto& cur = x[cell.id];
+	const auto& nebr = x[cell.nebr[0]];
+	TapeVariable res;
+	adouble rightIsPres = rightBoundIsPres;
 
-	trace_on(mid);
-	adouble h[var_size], tmp;
-	TapeVariable var[stencil];
-	const Variable& prev = cell.u_prev;
-
-	for (int i = 0; i < stencil; i++)
-	{
-		var[i].m <<= x[i * Variable::size];
-		var[i].p <<= x[i * Variable::size + 1];
-		var[i].sw <<= x[i * Variable::size + 2];
-		var[i].xa <<= x[i * Variable::size + 3];
-		var[i].xw <<= x[i * Variable::size + 4];
-		var[i].so <<= x[i * Variable::size + 5];
-		var[i].p_bub <<= x[i * Variable::size + 6];
-	}
-
-	TapeVariable& next = var[0];
-	adouble satur = cell.u_next.SATUR;
-	adouble rate = getReactionRate(next, props);
-	double rate0 = getReactionRate(next, props).value();
-
-	h[0] = (1.0 - next.m) * props.getDensity(next.p) -
-			(1.0 - prev.m) * props.getDensity(prev.p) - 
-			ht * reac.indices[REACTS::CALCITE] * reac.comps[REACTS::CALCITE].mol_weight * rate;
-	/*h[1] = next.m * (1.0 - next.sw - next.so) * props_g.getDensity(next.p) -
-		prev.m * (1.0 - prev.sw - prev.so) * props_g.getDensity(prev.p) -
-		ht * reac.indices[REACTS::CO2] * reac.comps[REACTS::CO2].mol_weight * rate;*/
-	condassign(h[1], satur,
-				next.m * ((1.0 - next.sw - next.so) * props_g.getDensity(next.p) +
-			next.so * props_o.gas_dens_stc * props_o.getRs(next.p, next.p_bub, satur) / props_o.getB(next.p, next.p_bub, satur)) -
-				prev.m * ((1.0 - prev.sw - prev.so) * props_g.getDensity(prev.p) + 
-			prev.so * props_o.gas_dens_stc * props_o.getRs(prev.p, prev.p_bub, prev.SATUR) / props_o.getB(prev.p, prev.p_bub, prev.SATUR)) -
-				ht * reac.indices[REACTS::CO2] * reac.comps[REACTS::CO2].mol_weight * rate,
-				next.m * next.so * props_o.gas_dens_stc * props_o.getRs(next.p, next.p_bub, satur) / props_o.getB(next.p, next.p_bub, satur) -
-			prev.m * prev.so * props_o.gas_dens_stc * props_o.getRs(prev.p, prev.p_bub, prev.SATUR) / props_o.getB(prev.p, prev.p_bub, prev.SATUR) - 
-				ht * reac.indices[REACTS::CO2] * reac.comps[REACTS::CO2].mol_weight * rate);
-	h[2] = next.m * next.sw * props_w.getDensity(next.p, next.xa, next.xw) -
-		prev.m * prev.sw * props_w.getDensity(prev.p, prev.xa, prev.xw) -
-		ht * (reac.indices[REACTS::ACID] * reac.comps[REACTS::ACID].mol_weight +
-			reac.indices[REACTS::WATER] * reac.comps[REACTS::WATER].mol_weight +
-			reac.indices[REACTS::SALT] * reac.comps[REACTS::SALT].mol_weight) * rate;
-	h[3] = next.m * next.sw * props_w.getDensity(next.p, next.xa, next.xw) * next.xa -
-		prev.m * prev.sw * props_w.getDensity(prev.p, prev.xa, prev.xw) * prev.xa -
-		ht * reac.indices[REACTS::ACID] * reac.comps[REACTS::ACID].mol_weight * rate;
-	h[4] = next.m * next.sw * props_w.getDensity(next.p, next.xa, next.xw) * next.xw -
-		prev.m * prev.sw * props_w.getDensity(prev.p, prev.xa, prev.xw) * prev.xw -
-		ht * reac.indices[REACTS::WATER] * reac.comps[REACTS::WATER].mol_weight * rate;
-	h[5] = next.m * next.so * props_o.dens_stc / props_o.getB(next.p, next.p_bub, satur) -
-			prev.m * prev.so * props_o.dens_stc / props_o.getB(prev.p, prev.p_bub, prev.SATUR);
-
-	int neighbor[4];
-	getNeighborIdx(cell.num, neighbor);
-	for (int i = 0; i < 4; i++)
-	{
-		const Cell& beta = cells[neighbor[i]];
-		const int upwd_idx = (getUpwindIdx(cell.num, neighbor[i]) == cell.num) ? 0 : i + 1;
-		const TapeVariable& nebr = var[i + 1];
-		TapeVariable& upwd = var[upwd_idx];
-		
-		adouble dens_w = getAverage(props_w.getDensity(next.p, next.xa, next.xw), cell, props_w.getDensity(nebr.p, nebr.xa, nebr.xw), beta);
-		adouble dens_o = getAverage(props_o.dens_stc / props_o.getB(next.p, next.p_bub, satur), cell, 
-									props_o.dens_stc / props_o.getB(nebr.p, nebr.p_bub, beta.u_next.SATUR), beta);
-		adouble dens_g = getAverage(props_g.getDensity(next.p), cell, props_g.getDensity(nebr.p), beta);
-		adouble dens_go = props_o.gas_dens_stc *
-				getAverage(props_o.getRs(next.p, next.p_bub, satur) / props_o.getB(next.p, next.p_bub, satur), cell,
-							props_o.getRs(nebr.p, nebr.p_bub, beta.u_next.SATUR) / props_o.getB(nebr.p, nebr.p_bub, beta.u_next.SATUR), beta);
-		
-		adouble buf_g = ht / cell.V * getTrans(cell, next.m, beta, nebr.m) * ((next.p - nebr.p) - dens_g * grav * (cell.z - beta.z)) *
-						dens_g * props_g.getKr(upwd.sw, upwd.so, cells[upwd_idx].props) / props_g.getViscosity(upwd.p);
-		adouble buf_w = ht / cell.V * getTrans(cell, next.m, beta, nebr.m) * ((next.p - nebr.p) - dens_w * grav * (cell.z - beta.z)) *
-						dens_w * props_w.getKr(upwd.sw, upwd.so, cells[upwd_idx].props) / props_w.getViscosity(upwd.p, upwd.xa, upwd.xw);
-		adouble buf_go = ht / cell.V * getTrans(cell, next.m, beta, nebr.m) * ((next.p - nebr.p) - dens_o * grav * (cell.z - beta.z)) *
-						dens_go * props_o.getKr(upwd.sw, upwd.so, cells[upwd_idx].props) / props_o.getViscosity(upwd.p);
-		adouble buf_o = ht / cell.V * getTrans(cell, next.m, beta, nebr.m) * ((next.p - nebr.p) - dens_o * grav * (cell.z - beta.z)) *
-			dens_o * props_o.getKr(upwd.sw, upwd.so, cells[upwd_idx].props) / props_o.getViscosity(upwd.p);
-
-		condassign(tmp, satur, buf_g + buf_go, buf_go);
-		h[1] += tmp;
-		h[2] += buf_w;
-		h[3] += buf_w * upwd.xa;
-		h[4] += buf_w * upwd.xw;
-		h[5] += buf_o;
-	}
-
-	//for (int i = 0; i < var_size; i++)
-	//	h[i] /= P_dim;
-
-	for (int i = 0; i < var_size; i++)
-		h[i] >>= y[i];
-
-	trace_off();
+	res.m = (cur.m - nebr.m) / P_dim;
+	condassign(res.p, rightIsPres, (cur.p - (adouble)(props_sk[0].p_out)) / P_dim, (cur.p - (adouble)(nebr.p)) / P_dim);
+	res.s = (cur.s - nebr.s) / P_dim;
+	res.xa = (cur.xa - nebr.xa) / P_dim;
+	res.xw = (cur.xw - nebr.xw) / P_dim;
+	return res;
 }
-void Acid2d::solve_eqLeft(const Cell& cell)
+
+/*void Acid2d::solve_eqLeft(const Cell& cell)
 {
 	const Cell& beta1 = cells[cell.num + cellsNum_z + 2];
 	const Cell& beta2 = cells[cell.num + 2 * cellsNum_z + 4];
@@ -384,161 +310,4 @@ void Acid2d::solve_eqLeft(const Cell& cell)
 		h[i] >>= y[i];
 
 	trace_off();
-}
-void Acid2d::solve_eqRight(const Cell& cell)
-{
-	trace_on(right);
-	adouble h[var_size];
-	TapeVariable var[Rstencil];
-	adouble rightIsPres = rightBoundIsPres;
-	for (int i = 0; i < Rstencil; i++)
-	{
-		var[i].m <<= x[i * Variable::size];
-		var[i].p <<= x[i * Variable::size + 1];
-		var[i].sw <<= x[i * Variable::size + 2];
-		var[i].xa <<= x[i * Variable::size + 3];
-		var[i].xw <<= x[i * Variable::size + 4];
-		var[i].so <<= x[i * Variable::size + 5];
-		var[i].p_bub <<= x[i * Variable::size + 6];
-	}
-
-	TapeVariable& next = var[0];
-	TapeVariable& nebr = var[1];
-	const Variable& prev = cell.u_prev;
-	const Skeleton_Props& props = *cell.props;
-	adouble satur = cell.u_next.SATUR;
-
-	h[0] = next.m - nebr.m;
-	condassign(h[1], rightIsPres, next.p - (adouble)(cell.props->p_out), next.p - (adouble)(nebr.p));
-	h[2] = next.sw - nebr.sw;
-	h[3] = next.xa - nebr.xa;
-	h[4] = next.xw - nebr.xw;
-	condassign(h[5], satur, next.so - nebr.so, next.p_bub - nebr.p_bub);
-	
-	//for (int i = 0; i < var_size; i++)
-	//	h[i] /= P_dim;
-
-	for (int i = 0; i < var_size; i++)
-		h[i] >>= y[i];
-
-	trace_off();
-}
-void Acid2d::solve_eqVertical(const Cell& cell)
-{
-	trace_on(vertical);
-	adouble h[var_size];
-	TapeVariable var[Vstencil];
-
-	for (int i = 0; i < Vstencil; i++)
-	{
-		var[i].m <<= x[i * Variable::size];
-		var[i].p <<= x[i * Variable::size + 1];
-		var[i].sw <<= x[i * Variable::size + 2];
-		var[i].xa <<= x[i * Variable::size + 3];
-		var[i].xw <<= x[i * Variable::size + 4];
-		var[i].so <<= x[i * Variable::size + 5];
-		var[i].p_bub <<= x[i * Variable::size + 6];
-	}
-
-	const TapeVariable& next = var[0];
-	const TapeVariable& nebr = var[1];
-	adouble satur = cell.u_next.SATUR;
-
-	h[0] = next.m - nebr.m;
-	h[1] = next.p - nebr.p;
-	h[2] = next.sw - nebr.sw;
-	h[3] = next.xa - nebr.xa;
-	h[4] = next.xw - nebr.xw;
-	condassign(h[5], satur, next.so - nebr.so, next.p_bub - nebr.p_bub);
-
-	//for (int i = 0; i < var_size; i++)
-	//	h[i] /= P_dim;
-
-	for (int i = 0; i < var_size; i++)
-		h[i] >>= y[i];
-
-	trace_off();
-}
-void Acid2d::setVariables(const Cell& cell)
-{
-	if (cell.type == Type::WELL_LAT)
-	{
-		// Left
-		const Variable& next = cell.u_next;
-		const Variable& nebr1 = cells[cell.num + cellsNum_z + 2].u_next;
-		const Variable& nebr2 = cells[cell.num + 2 * cellsNum_z + 4].u_next;
-		for (int i = 0; i < Variable::size; i++)
-		{
-			x[i] = next.values[i];
-			x[Variable::size + i] = nebr1.values[i];
-			x[2 * Variable::size + i] = nebr2.values[i];
-		}
-
-		solve_eqLeft(cell);
-		jacobian(left, var_size, Variable::size * Lstencil, x, jac);
-	}
-	else if (cell.type == Type::RIGHT)
-	{
-		// Right
-		const Variable& next = cells[cell.num].u_next;
-		const Variable& nebr1 = cells[cell.num - cellsNum_z - 2].u_next;
-		const Variable& nebr2 = cells[cell.num - 2 * cellsNum_z - 4].u_next;
-		for (int i = 0; i < Variable::size; i++)
-		{
-			x[i] = next.values[i];
-			x[Variable::size + i] = nebr1.values[i];
-			x[2 * Variable::size + i] = nebr2.values[i];
-		}
-
-		solve_eqRight(cell);
-		jacobian(right, var_size, Variable::size * Rstencil, x, jac);
-	}
-	else if (cell.type == Type::TOP)
-	{
-		// Top
-		const Variable& next = cells[cell.num].u_next;
-		const Variable& nebr = cells[cell.num + 1].u_next;
-		for (int i = 0; i < Variable::size; i++)
-		{
-			x[i] = next.values[i];
-			x[Variable::size + i] = nebr.values[i];
-		}
-
-		solve_eqVertical(cell);
-		jacobian(vertical, var_size, Variable::size * Vstencil, x, jac);
-	}
-	else if (cell.type == Type::BOTTOM)
-	{
-		// Bottom
-		const Variable& next = cells[cell.num].u_next;
-		const Variable& nebr = cells[cell.num - 1].u_next;
-		for (int i = 0; i < Variable::size; i++)
-		{
-			x[i] = next.values[i];
-			x[Variable::size + i] = nebr.values[i];
-		}
-
-		solve_eqVertical(cell);
-		jacobian(vertical, var_size, Variable::size * Vstencil, x, jac);
-	}
-	else if (cell.type == Type::MIDDLE)
-	{
-		// Middle
-		const Variable& next = cells[cell.num].u_next;
-		int neighbor[stencil - 1];
-		getNeighborIdx(cell.num, neighbor);
-		for (int i = 0; i < Variable::size; i++)
-		{
-			x[i] = next.values[i];
-
-			for (int j = 0; j < stencil - 1; j++)
-			{
-				const Variable& nebr = cells[neighbor[j]].u_next;
-				x[(j + 1) * Variable::size + i] = nebr.values[i];
-			}
-		}
-
-		solve_eqMiddle(cell);
-		jacobian(mid, var_size, Variable::size * stencil, x, jac);
-	}
-}
+}*/

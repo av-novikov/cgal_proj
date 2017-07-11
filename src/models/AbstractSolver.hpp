@@ -13,14 +13,14 @@ public:
 	typedef modelType Model;
 	typedef typename Model::Mesh Mesh;
 	typedef typename Model::Cell Cell;
-	typedef typename Model::TapeVariable TapeVariable;
+	static const int var_size = Model::var_size;
 protected:
 	double** jac;
 	double* y;
 
 	Model* model;
 	Mesh* mesh;
-	const int size;
+	const size_t size;
 			
 	int curTimePeriod;
 	const double Tt;
@@ -38,7 +38,7 @@ protected:
 		
 	double convergance(int& ind, int& varInd);
 	double averValue(int varInd);
-	void averValue(std::array<double, modelType::var_size>& aver);
+	void averValue(std::array<double, var_size>& aver);
 		
 	virtual void writeData() = 0;
 	virtual void control() = 0;
@@ -94,15 +94,17 @@ public:
 		for (const auto& cell : mesh->cells)
 		{
 			getMatrixStencil(cell);
-			for (const int idx : stencil_idx)
-			{
-				ind_i[counter] = Model::var_size * cell.id;			ind_j[counter++] = Model::var_size * idx;
-			}
+			for (size_t i = 0; i < var_size; i++)
+				for (const int idx : stencil_idx)
+					for (size_t j = 0; j < var_size; j++)
+					{
+						ind_i[counter] = var_size * cell.id + i;			ind_j[counter++] = var_size * idx + j;
+					}
 			stencil_idx.clear();
 		}
 
 		elemNum = counter;
-		for (int i = 0; i < Model::var_size * model->cellsNum; i++)
+		for (int i = 0; i < var_size * model->cellsNum; i++)
 			ind_rhs[i] = i;
 	}
 	virtual void start();

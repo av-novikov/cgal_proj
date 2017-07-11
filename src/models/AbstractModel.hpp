@@ -33,8 +33,8 @@ protected:
 	double r_w;
 	double r_e;
 	double Volume;
-	int cellsNum;
-	int varNum;
+	size_t cellsNum;
+	size_t varNum;
 		
 	// Rate of the well
 	double Q_sum;
@@ -42,7 +42,7 @@ protected:
 	// Ranges of perforated cells numbers
 	std::vector<std::pair<int,int> > perfIntervals;
 	// Vector of <cell number, rate in the cell> for left border cells
-	std::map<int,double> Qcell;
+	std::map<size_t,double> Qcell;
 
 	// Temporary properties
 	double ht;
@@ -50,7 +50,7 @@ protected:
 	double ht_max;
 		
 	// Number of periods
-	int periodsNum;
+	size_t periodsNum;
 	// End times of periods [sec]
 	std::vector<double> period;
 	// Oil rates [m3/day]
@@ -66,7 +66,7 @@ protected:
 	// During the time flow rate decreases 'e' times in well test [sec] 
 	double alpha;
 	double wellboreDuration;
-	int skeletonsNum;
+	size_t skeletonsNum;
 
 	virtual void loadMesh(const Task& task)
 	{

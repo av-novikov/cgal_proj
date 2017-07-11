@@ -13,16 +13,13 @@ using std::setprecision;
 
 Oil2dSolver::Oil2dSolver(Model* _model) : AbstractSolver<Model>(_model)
 {
-	y = new double[Model::var_size * size];
-	/*jac = new double*[Model::var_size * size];
-	for (int i = 0; i < size; i++)
-		jac[i] = new double[Model::var_size * size];*/
+	y = new double[var_size * size];
 
-	const int strNum = Model::var_size * model->cellsNum;
-	ind_i = new int[stencil * Model::var_size * strNum];
-	ind_j = new int[stencil * Model::var_size * strNum];
+	const int strNum = var_size * model->cellsNum;
+	ind_i = new int[mesh::stencil * var_size * strNum];
+	ind_j = new int[mesh::stencil * var_size * strNum];
 	cols = new int[strNum];
-	a = new double[stencil * Model::var_size * strNum];
+	a = new double[mesh::stencil * var_size * strNum];
 	ind_rhs = new int[strNum];
 	rhs = new double[strNum];
 
@@ -54,7 +51,7 @@ void Oil2dSolver::writeData()
 
 	plot_Q << cur_t * t_dim / 3600.0;
 
-	map<int, double>::iterator it;
+	map<size_t, double>::iterator it;
 	for (it = model->Qcell.begin(); it != model->Qcell.end(); ++it)
 	{
 		p += model->u_next[it->first * Model::var_size] * model->P_dim;
@@ -147,8 +144,8 @@ void Oil2dSolver::copySolution(const paralution::LocalVector<double>& sol)
 {
 	for (int i = 0; i < size; i++)
 	{
-		auto& cell = (*model)[i];
-		cell.u_next.p += sol[Model::var_size * i];
+		auto& var = (*model)[i].u_next;
+		var.p += sol[Model::var_size * i];
 	}
 }
 
@@ -156,8 +153,8 @@ void Oil2dSolver::computeJac()
 {
 	trace_on(0);
 
-	for (int i = 0; i < size; i++)
-		model->x[i].p <<= model->u_next[i];
+	for (size_t i = 0; i < size; i++)
+		model->x[i].p <<= model->u_next[i * var_size];
 
 	//adouble isInner, isBorder, isWell;
 	for (int i = 0; i < mesh->inner_cells; i++)
@@ -192,8 +189,6 @@ void Oil2dSolver::fill()
 	int counter = 0;
 	for (const auto& cell : mesh->cells)
 	{
-		//model->setVariables(cell);
-
 		//getMatrixStencil(cell);
 		for (int i = 0; i < Model::var_size; i++)
 		{

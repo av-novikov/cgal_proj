@@ -18,16 +18,23 @@ namespace acid2d
 		double xa_init;
 		double xw_init;
 
-		//double d_pore_r, d_pore_z;
+		inline double getPermCoseni_x_value(const double m) const
+		{
+			return kx * (m * m * m / (1 - m) / (1 - m)) /
+				(m_init * m_init * m_init / (1 - m_init) / (1 - m_init));
+		};
+		inline double getPermCoseni_y_value(const double m) const
+		{
+			return ky * (m * m * m / (1 - m) / (1 - m)) /
+				(m_init * m_init * m_init / (1 - m_init) / (1 - m_init));
+		};
 		inline adouble getPermCoseni_x(adouble m) const
 		{
-			//return d_pore_r * d_pore_r * m * m * m / (1 - m) / (1 - m) / 150.0;
 			return kx * (m * m * m / (1 - m) / (1 - m)) / 
 							(m_init * m_init * m_init / (1 - m_init) / (1 - m_init));
 		};
 		inline adouble getPermCoseni_y(adouble m) const
 		{
-			//return d_pore_z * d_pore_z * m * m * m / (1 - m) / (1 - m) / 150.0;
 			return ky * (m * m * m / (1 - m) / (1 - m)) /
 				(m_init * m_init * m_init / (1 - m_init) / (1 - m_init));
 		};

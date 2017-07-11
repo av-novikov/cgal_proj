@@ -1,9 +1,10 @@
 #include "src/models/AbstractSolver.hpp"
 #include "src/util/utils.h"
-#include "src/models/Oil2d/Oil2d.hpp"
-
 #include <iomanip>
 #include <iterator>
+
+#include "src/models/Oil2d/Oil2d.hpp"
+#include "src/models/Acid/Acid2d.hpp"
 
 using namespace std;
 
@@ -94,13 +95,13 @@ double AbstractSolver<modelType>::averValue(const int varInd)
 	return tmp / mesh->Volume;
 }
 template <class modelType>
-void AbstractSolver<modelType>::averValue(std::array<double, modelType::var_size>& aver)
+void AbstractSolver<modelType>::averValue(std::array<double, var_size>& aver)
 {
 	std::fill(aver.begin(), aver.end(), 0.0);
 
-	for (int i = 0; i < modelType::var_size; i++)
+	for (int i = 0; i < var_size; i++)
 	{
-		const auto var = static_cast<std::valarray<double>>(model->u_next[std::slice(i, model->cellsNum, modelType::var_size)]);
+		const auto var = static_cast<std::valarray<double>>(model->u_next[std::slice(i, model->cellsNum, var_size)]);
 		int cell_idx = 0;
 		for (const auto& cell : mesh->cells)
 			aver[i] += var[cell_idx++] * cell.V;
@@ -115,3 +116,4 @@ void AbstractSolver<modelType>::checkStability()
 }
 
 template class AbstractSolver<oil2d::Oil2d>;
+template class AbstractSolver<acid2d::Acid2d>;

@@ -39,6 +39,7 @@ typedef size_t VertexInfo;
 
 namespace mesh
 {
+	static const int stencil = 4;
 	struct Iterator {
 		typedef size_t Index;
 
@@ -255,11 +256,11 @@ namespace mesh
 		};
 		~TriangleMesh() {};
 
-		int getCellsSize() const
+		size_t getCellsSize() const
 		{
 			return cells.size();
 		}
-		int getVerticesSize() const
+		size_t getVerticesSize() const
 		{
 			return vertexHandles.size();
 		}

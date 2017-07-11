@@ -144,7 +144,7 @@ double Oil2d::getRate(const size_t cell_idx)
 adouble Oil2d::solveInner(const Cell& cell)
 {
 	const auto& cur = x[cell.id];
-	const auto& prev = (*this)[cell.id].u_prev;
+	const auto prev = (*this)[cell.id].u_prev;
 
 	adouble H = props_sk[0].getPoro(cur.p) * props_oil.getDensity(cur.p) - props_sk[0].getPoro(prev.p) * props_oil.getDensity(prev.p);
 	for (int i = 0; i < 3; i++)
