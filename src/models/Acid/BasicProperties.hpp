@@ -6,29 +6,18 @@
 #include "src/util/utils.h"
 
 namespace basic2d
-{
-	// ADOLC stencil ids
-	const int mid = 1;
-	const int left = 2;
-	const int right = 3;
-	const int vertical = 4;
-		
+{		
 	struct Skeleton_Props
 	{
 		double beta;
 		double dens_stc;
-		double perm_r;
-		double perm_z;
+		double kx, ky;
 
 		double m_init;
 		double p_ref;
 		inline adouble getPoro(adouble p) const
 		{
 			return (adouble)(m_init)* ((adouble)(1.0) + (adouble)(beta)* (p - p_ref));
-		};
-		inline double getPerm_r(const double r) const
-		{
-			return (r > radius_eff ? perm_r : perm_eff);
 		};
 
 		// Permeability of colmatage zone [mD]
@@ -94,6 +83,8 @@ namespace basic2d
 	};
 	struct Properties
 	{
+		double R_dim;
+
 		// Vector of start times of periods [sec]
 		std::vector<double> timePeriods;
 		// Vector of rates [m3/day]

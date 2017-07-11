@@ -3,7 +3,6 @@
 
 #include "src/models/Variables.hpp"
 #include "src/models/AbstractModel.hpp"
-
 #include "src/models/Oil2d/Properties.hpp"
 
 namespace oil2d
@@ -19,7 +18,6 @@ namespace oil2d
 	protected:
 		void setProps(const Properties& props);
 		void makeDimLess();
-		void setPerforated();
 		void setInitialState();
 
 		TapeVariable* x;

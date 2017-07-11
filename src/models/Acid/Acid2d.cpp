@@ -12,28 +12,44 @@ double acid2d::Component::p_std = 101325.0;
 
 Acid2d::Acid2d()
 {
-	x = new double[stencil * Variable::size];
-	y = new double[var_size];
-
-	jac = new double*[var_size];
-	for (int i = 0; i < var_size; i++)
-		jac[i] = new double[stencil * Variable::size];
 }
 Acid2d::~Acid2d()
 {
-	delete x;
-	delete y;
-
-	for (int i = 0; i < var_size; i++)
-		delete[] jac[i];
-	delete[] jac;
+	delete[] x, h;
 }
 void Acid2d::setProps(Properties& props)
 {
+	R_dim = props.R_dim;
+	r_w = props.r_w;
+	r_e = props.r_e;
+
+	leftBoundIsRate = props.leftBoundIsRate;
+	rightBoundIsPres = props.rightBoundIsPres;
+
+	perfIntervals = props.perfIntervals;
+
 	props_sk = props.props_sk;
-	setBasicProps(props);
+	skeletonsNum = props.props_sk.size();
+	for (int j = 0; j < skeletonsNum; j++)
+	{
+		props_sk[j].kx = MilliDarcyToM2(props_sk[j].kx);
+		props_sk[j].ky = MilliDarcyToM2(props_sk[j].ky);
+	}
+
+	periodsNum = props.timePeriods.size();
 	for (int i = 0; i < periodsNum; i++)
+	{
+		period.push_back(props.timePeriods[i]);
 		xas.push_back(props.xa[i]);
+		if (leftBoundIsRate)
+			rate.push_back(props.rates[i] / 86400.0);
+		else
+			pwf.push_back(props.pwf[i]);
+	}
+
+	ht = props.ht;
+	ht_min = props.ht_min;
+	ht_max = props.ht_max;
 
 	props_w = props.props_w;
 	props_w.visc = cPToPaSec(props_w.visc);
@@ -41,33 +57,55 @@ void Acid2d::setProps(Properties& props)
 	props_o = props.props_o;
 	props_o.visc = cPToPaSec(props_o.visc);
 
-	props_g = props.props_g;
-	props_g.visc = cPToPaSec(props_g.visc);
-	props_g.co2.mol_weight = gramToKg(props_g.co2.mol_weight);
-
-	props_o.gas_dens_stc = props_g.co2.rho_stc;
-
 	for (auto& comp : reac.comps)
 		comp.mol_weight = gramToKg(comp.mol_weight);
 
-	makeBasicDimLess();
 	makeDimLess();
 
 	// Data sets
-	props_o.b = setDataset(props.B_oil, P_dim / BAR_TO_PA, 1.0);
-	props_o.Rs = setDataset(props.Rs, P_dim / BAR_TO_PA, 1.0);
-	props_g.rho = setDataset(props.rho_co2, P_dim / BAR_TO_PA, (P_dim * t_dim * t_dim / R_dim / R_dim));
+	//props_o.b = setDataset(props.B_oil, P_dim / BAR_TO_PA, 1.0);
+	//props_o.Rs = setDataset(props.Rs, P_dim / BAR_TO_PA, 1.0);
+	//props_g.rho = setDataset(props.rho_co2, P_dim / BAR_TO_PA, (P_dim * t_dim * t_dim / R_dim / R_dim));
 }
 void Acid2d::makeDimLess()
 {
 	T_dim = Component::T;
+	t_dim = 3600.0;
+	P_dim = props_sk[0].p_init;
 
 	Component::p_std /= P_dim;
 	Component::R /= (P_dim * R_dim * R_dim * R_dim / T_dim);
 	Component::T /= T_dim;
 
-	for (auto& sk : props_sk)
-		sk.p_sat /= P_dim;
+	// Temporal properties
+	ht /= t_dim;
+	ht_min /= t_dim;
+	ht_max /= t_dim;
+
+	// Grid properties
+	r_w /= R_dim;
+	r_e /= R_dim;
+
+	for (auto& props : props_sk)
+	{
+		props.kx /= (R_dim * R_dim);
+		props.ky /= (R_dim * R_dim);
+		props.dens_stc /= (P_dim * t_dim * t_dim / R_dim / R_dim);
+		props.beta /= (1.0 / P_dim);
+		props.height /= R_dim;
+		props.p_init /= P_dim;
+		props.p_out /= P_dim;
+	}
+
+	Q_dim = R_dim * R_dim * R_dim / t_dim;
+	for (int i = 0; i < periodsNum; i++)
+	{
+		period[i] /= t_dim;
+		if (leftBoundIsRate)
+			rate[i] /= Q_dim;
+		else
+			pwf[i] /= P_dim;
+	}
 
 	props_w.visc /= (P_dim * t_dim);
 	props_w.dens_stc /= (P_dim * t_dim * t_dim / R_dim / R_dim);
@@ -76,10 +114,6 @@ void Acid2d::makeDimLess()
 	props_o.dens_stc /= (P_dim * t_dim * t_dim / R_dim / R_dim);
 	props_o.gas_dens_stc /= (P_dim * t_dim * t_dim / R_dim / R_dim);
 	props_o.beta /= (1.0 / P_dim);
-	props_g.visc /= (P_dim * t_dim);
-	props_g.dens_stc /= (P_dim * t_dim * t_dim / R_dim / R_dim);
-	props_g.co2.mol_weight /= (P_dim * t_dim * t_dim * R_dim);
-	props_g.co2.rho_stc /= (P_dim * t_dim * t_dim / R_dim / R_dim);
 
 	reac.activation_energy /= (P_dim * R_dim * R_dim * R_dim);
 	reac.surf_init /= (1.0 / R_dim);
@@ -95,17 +129,6 @@ void Acid2d::setPeriod(int period)
 	if (leftBoundIsRate)
 	{
 		Q_sum = rate[period];
-
-		if (period == 0 || rate[period - 1] < EQUALITY_TOLERANCE) {
-			std::map<int, double>::iterator it;
-			for (it = Qcell.begin(); it != Qcell.end(); ++it)
-				it->second = Q_sum * cells[it->first].hz / height_perf;
-		}
-		else {
-			std::map<int, double>::iterator it;
-			for (it = Qcell.begin(); it != Qcell.end(); ++it)
-				it->second = it->second * Q_sum / rate[period - 1];
-		}
 	}
 	else
 	{
@@ -114,46 +137,81 @@ void Acid2d::setPeriod(int period)
 	}
 
 	xa = xas[period];
-
-	for (int i = 0; i < skeletonsNum; i++)
-	{
-		props_sk[i].radius_eff = props_sk[i].radiuses_eff[period];
-		props_sk[i].perm_eff = props_sk[i].perms_eff[period];
-		props_sk[i].skin = props_sk[i].skins[period];
-	}
 }
 void Acid2d::setInitialState()
 {
-	vector<Cell>::iterator it;
-	for (it = cells.begin(); it != cells.end(); ++it)
+	const auto& props = props_sk[0];
+	for (size_t i = 0; i < cellsNum; i++)
 	{
-		Skeleton_Props* props = &props_sk[getSkeletonIdx(*it)];
-		it->u_prev.m = it->u_iter.m = it->u_next.m = props->m_init;
-		it->u_prev.p = it->u_iter.p = it->u_next.p = props->p_init;
-		it->u_prev.sw = it->u_iter.sw = it->u_next.sw = props->sw_init;
-		it->u_prev.xa = it->u_iter.xa = it->u_next.xa = props->xa_init;
-		it->u_prev.xw = it->u_iter.xw = it->u_next.xw = props->xw_init;
-		it->u_prev.so = it->u_iter.so = it->u_next.so = props->so_init;
-		it->u_prev.p_bub = it->u_iter.p_bub = it->u_next.p_bub = props->p_sat;
-		if (props->p_init < props->p_sat)
-			it->u_prev.SATUR = it->u_iter.SATUR = it->u_next.SATUR = true;
-		else
-			it->u_prev.SATUR = it->u_iter.SATUR = it->u_next.SATUR = false;
+		const auto& cell = mesh->cells[i];
+		auto data = (*this)[i];
 
-		it->props = props;
+		if (cell.type == CellType::FRAC)
+			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init * 0.99;
+		else
+			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init;
+		data.u_prev.m = data.u_iter.m = data.u_next.m = props.m_init;
+		data.u_prev.s = data.u_iter.s = data.u_next.s = props.s_init;
+		data.u_prev.xa = data.u_iter.xa = data.u_next.xa = props.xa_init;
+		data.u_prev.xw = data.u_iter.xw = data.u_next.xw = props.xw_init;
 	}
+
+	x = new TapeVariable[cellsNum];
+	h = new adouble[var_size * cellsNum];
 }
 double Acid2d::getRate(int cur)
 {
-	const Cell& cell = cells[cur];
-	const Cell& beta = cells[cur + cellsNum_z + 2];
-	const Variable& next = cell.u_next;
-	const Variable& nebr = beta.u_next;
-
-	return props_w.getDensity(next.p, next.xa, next.xw).value() / props_w.getDensity(Component::p_std, next.xa, next.xw).value() *
-		getTrans(cell, next.m, beta, nebr.m).value() / props_w.getViscosity(next.p, next.xa, next.xw).value() * 
-		(nebr.p - next.p);
+	return 0.0;
 };
+
+TapeVariable Acid2d::solveInner(const Cell& cell)
+{
+	const auto& cur = x[cell.id];
+	const auto& prev = (*this)[cell.id].u_prev;
+	const auto& props = props_sk[0];
+
+	adouble rate = getReactionRate(cur, props);
+	TapeVariable res;
+	res.m = (1.0 - cur.m) * props.getDensity(cur.p) - (1.0 - prev.m) * props.getDensity(prev.p) -
+		ht * reac.indices[REACTS::CALCITE] * reac.comps[REACTS::CALCITE].mol_weight * rate;
+	res.p = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) -
+		prev.m * prev.s * props_w.getDensity(prev.p, prev.xa, prev.xw) -
+		ht * (reac.indices[REACTS::ACID] * reac.comps[REACTS::ACID].mol_weight +
+			reac.indices[REACTS::WATER] * reac.comps[REACTS::WATER].mol_weight +
+			reac.indices[REACTS::SALT] * reac.comps[REACTS::SALT].mol_weight) * rate;
+	res.s = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) * cur.xa -
+		prev.m * prev.s * props_w.getDensity(prev.p, prev.xa, prev.xw) * prev.xa -
+		ht * reac.indices[REACTS::ACID] * reac.comps[REACTS::ACID].mol_weight * rate;
+	res.xa = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) * cur.xw -
+		prev.m * prev.s * props_w.getDensity(prev.p, prev.xa, prev.xw) * prev.xw -
+		ht * reac.indices[REACTS::WATER] * reac.comps[REACTS::WATER].mol_weight * rate;
+	H[4] = cur.m * cur.s * props_o.dens_stc / props_o.getB(cur.p) -
+		prev.m * prev.s * props_o.dens_stc / props_o.getB(prev.p);
+
+	for (int i = 0; i < 3; i++)
+	{
+		const int nebr_idx = cell.nebr[i];
+		const auto& beta = mesh->cells[nebr_idx];
+		const auto& nebr = x[nebr_idx];
+		const int upwd_idx = getUpwindIdx(cell.id, beta.id);
+		TapeVariable& upwd = x[upwd_idx];
+
+		adouble dens_w = linearAppr(props_w.getDensity(cur.p, cur.xa, cur.xw), cell.dist[i], 
+									props_w.getDensity(nebr.p, nebr.xa, nebr.xw), beta.getDistance(cell.id));
+		adouble dens_o = linearAppr(props_o.getDensity(cur.p), cell.dist[i],
+									props_o.getDensity(nebr.p), beta.getDistance(cell.id));
+		adouble buf_w = ht / cell.V * getTrans(cell, i, beta) * (cur.p - nebr.p) *
+			dens_w * props_w.getKr(upwd.s, props) / props_w.getViscosity(upwd.p, upwd.xa, upwd.xw);
+		adouble buf_o = ht / cell.V * getTrans(cell, i, beta) * (cur.p - nebr.p) *
+			dens_o * props_o.getKr(upwd.s, props) / props_o.getViscosity(upwd.p);
+
+		h[1] += buf_w;
+		h[2] += buf_w * upwd.xa;
+		h[3] += buf_w * upwd.xw;
+		h[4] += buf_o;
+	}
+	return res;
+}
 
 void Acid2d::solve_eqMiddle(const Cell& cell)
 {

@@ -97,14 +97,6 @@ void Oil2d::makeDimLess()
 
 	alpha /= t_dim;
 }
-void Oil2d::setPerforated()
-{
-	// Well locating & preparing
-	Qcell[mesh->well_idx] = 0.0;
-
-	x = new TapeVariable[cellsNum];
-	h = new adouble[var_size * cellsNum];
-}
 void Oil2d::setInitialState()
 {
 	const auto& props = props_sk[0];
@@ -117,6 +109,9 @@ void Oil2d::setInitialState()
 		else
 			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init;
 	}
+
+	x = new TapeVariable[cellsNum];
+	h = new adouble[var_size * cellsNum];
 }
 void Oil2d::setPeriod(const int period)
 {
