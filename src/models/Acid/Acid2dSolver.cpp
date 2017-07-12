@@ -194,7 +194,7 @@ void Acid2dSolver::solveStep()
 		computeJac();
 		fill();
 		solver.Assemble(ind_i, ind_j, a, elemNum, ind_rhs, rhs);
-		solver.Solve(PRECOND::ILU_SERIOUS);
+		solver.Solve(PRECOND::ILU_SIMPLE);
 		copySolution(solver.getSolution());
 
 		checkStability();
@@ -205,6 +205,7 @@ void Acid2dSolver::solveStep()
 			dAverVal[i] = fabs(averVal[i] - averValPrev[i]);
 		averValPrev = averVal;
 
+		model->snapshot_all(iterations + 1);
 		iterations++;
 	}
 
@@ -228,11 +229,11 @@ void Acid2dSolver::computeJac()
 	{
 		const auto& cell = mesh->cells[i];
 		TapeVariable tmp = model->solveInner(cell);
-		model->h[var_size * i] = cell.V * tmp.m;
-		model->h[var_size * i + 1] = cell.V * tmp.p;
-		model->h[var_size * i + 2] = cell.V * tmp.s;
-		model->h[var_size * i + 3] = cell.V * tmp.xa;
-		model->h[var_size * i + 4] = cell.V * tmp.xw;
+		model->h[var_size * i] = tmp.m;
+		model->h[var_size * i + 1] = tmp.p;
+		model->h[var_size * i + 2] = tmp.s;
+		model->h[var_size * i + 3] = tmp.xa;
+		model->h[var_size * i + 4] = tmp.xw;
 	}
 	// Border cells
 	for (size_t i = mesh->border_beg; i < model->cellsNum; i++)
@@ -245,11 +246,20 @@ void Acid2dSolver::computeJac()
 		model->h[var_size * i + 3] = tmp.xa;
 		model->h[var_size * i + 4] = tmp.xw;
 	}
+/*	for (size_t i = 0; i < mesh->fracCells.size(); i++)
+	{
+		const auto& cell = *mesh->fracCells[i];
+		model->h[var_size * cell.id] *= sqrt(cell.V);
+		model->h[var_size * cell.id + 1] *= sqrt(cell.V);
+		model->h[var_size * cell.id + 2] *= sqrt(cell.V);
+		model->h[var_size * cell.id + 3] *= sqrt(cell.V);
+		model->h[var_size * cell.id + 4] *= sqrt(cell.V);
+	}*/
 	// Well cell
 	const int well_idx = mesh->well_idx;
 	TapeVariable& cur = model->x[well_idx];
 	model->h[well_idx * var_size + 1] = (cur.s - (1.0 - model->props_sk[0].s_oc)) / model->P_dim;
-	model->h[well_idx * var_size + 2] += mesh->cells[well_idx].V * model->ht * model->props_w.getDensity(cur.p, cur.xa, cur.xw) * model->Q_sum;
+	model->h[well_idx * var_size + 2] += /*mesh->cells[well_idx].V */ model->ht * model->props_w.getDensity(cur.p, cur.xa, cur.xw) * model->Q_sum;
 	model->h[well_idx * var_size + 3] = (cur.xa - model->xa) / model->P_dim;
 	model->h[well_idx * var_size + 4] = (cur.xw - (1.0 - model->xa)) / model->P_dim;
 

@@ -150,7 +150,7 @@ void Acid2d::setInitialState()
 		if (cell.type == CellType::FRAC || cell.type == CellType::WELL)
 		{
 			data.u_prev.p = data.u_iter.p = data.u_next.p = props.p_init;
-			data.u_prev.m = data.u_iter.m = data.u_next.m = 1.0;
+			data.u_prev.m = data.u_iter.m = data.u_next.m = 0.6;
 		}
 		else
 		{

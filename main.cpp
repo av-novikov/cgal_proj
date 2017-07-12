@@ -56,7 +56,7 @@ acid2d::Properties* getProps()
 	props->timePeriods.push_back(30.0 * 3600.0);
 	props->leftBoundIsRate = true;
 	props->rightBoundIsPres = true;
-	props->rates.push_back(-10.0);
+	props->rates.push_back(0.1);
 	props->rates.push_back(0.0);
 	//props->pwf.push_back(250.0 * 1.0e+5);
 	//props->pwf.push_back(250.0 * 1.0e+5);
@@ -70,7 +70,7 @@ acid2d::Properties* getProps()
 	props->alpha = 7200.0;
 
 	props->r_w = 0.1;
-	props->R_dim = props->r_w;
+	props->R_dim = props->r_w * 10.0;
 	props->r_e = 150.0;
 
 	props->perfIntervals.push_back(make_pair(1, 1));
@@ -80,7 +80,7 @@ acid2d::Properties* getProps()
 	tmp.cellsNum_z = 1;
 	tmp.m_init = 0.1;
 	tmp.p_init = tmp.p_out = tmp.p_ref = 200.0 * 1.0e+5;
-	tmp.s_init = 0.2;
+	tmp.s_init = 0.8;
 	tmp.xa_init = 0.0;	tmp.xw_init = 1.0;
 	tmp.s_wc = 0.0;		tmp.s_oc = 0.0;		tmp.s_gc = 0.00;
 	tmp.xa_eqbm = 0.0;
@@ -108,12 +108,14 @@ acid2d::Properties* getProps()
 	return props;
 }
 
-Task* getMeshTask(const double x_dim)
+Task* getMeshTask(double& x_dim)
 {
 	Task* task = new Task;
 
 	typedef Task::Body::Point Point;
 
+	double w = 0.1;
+	x_dim = w * 1000.0;		w /= x_dim;
 	task->spatialStep = 50.0 / x_dim;
 	Task::Body::Border body1border = { { 300 / x_dim, 300 / x_dim },
 										{ -300 / x_dim, 300 / x_dim },
@@ -122,12 +124,11 @@ Task* getMeshTask(const double x_dim)
 	//Task::Body::Border body2border = { { 3, 3 },{ 9, 3 },{ 9, -3 },{ 3, -3 } };
 	task->bodies = { Task::Body({ 0, body1border,{} }) };
 
-	const double w = 1 / x_dim;
 	Point pt1 = { -100 / x_dim, w / 2.0 / x_dim };			Point pt2 = { 100 / x_dim, w / 2.0 / x_dim };
 	Point pt3 = pt2;		pt3[1] -= w;
 	Point pt4 = pt1;		pt4[1] -= w;
 
-	const int SIZE = 5000;
+	const int SIZE = 1;
 	double dx = (pt2[0] - pt1[0]) / (double)SIZE;
 	double dy = (pt2[1] - pt1[1]) / (double)SIZE;
 	Point p1, p2;

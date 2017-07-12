@@ -45,13 +45,8 @@ namespace acid2d
 		inline adouble getReactionRate(const Cell& cell, const Skeleton_Props& props) const
 		{
 			const TapeVariable& var = x[cell.id];
-			adouble isNotFrac = (cell.type == CellType::INNER || cell.type == CellType::BORDER) ? true : false;
-			adouble tmp;
-			condassign(tmp, isNotFrac, 
-				var.s * props_w.getDensity(var.p, var.xa, var.xw) *	(var.xa - props.xa_eqbm) *
-				reac.getReactionRate(props.m_init, var.m) / reac.comps[REACTS::ACID].mol_weight, 
-				(adouble)0.0);
-			return tmp;
+			return var.s * props_w.getDensity(var.p, var.xa, var.xw) *	(var.xa - props.xa_eqbm) *
+				reac.getReactionRate(props.m_init, var.m) / reac.comps[REACTS::ACID].mol_weight;
 		};
 		const adouble getPerm(const Cell& cell) const
 		{

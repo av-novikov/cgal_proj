@@ -66,7 +66,7 @@ void ParSolver::Solve(const PRECOND key)
 void ParSolver::SolveBiCGStab_ILUT()
 {
 	bicgstab.SetOperator(Mat);
-	p_ilut.Set(1.E-15, 100);
+	p_ilut.Set(1.E-20, 100);
 	bicgstab.SetPreconditioner(p_ilut);
 	bicgstab.Build();
 	isAssembled = true;
@@ -118,7 +118,7 @@ void ParSolver::SolveBiCGStab_Simple()
 	bicgstab.Build();
 	isAssembled = true;
 
-	bicgstab.Init(1.E-17, 1.E-12, 1E+12, 500);
+	bicgstab.Init(1.E-20, 1.E-12, 1E+12, 500);
 	Mat.info();
 
 	//bicgstab.RecordResidualHistory();
