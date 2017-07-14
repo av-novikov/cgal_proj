@@ -91,7 +91,7 @@ void VTKSnapshotter<oil2d::Oil2d>::dump(const int i)
 		vol->InsertNextValue(cell.V);
 		id->InsertNextValue(cell.id);
 		const auto& var = (*model)[i].u_next;
-		pres->InsertNextValue(var.p * model->P_dim);
+		pres->InsertNextValue(var.p * model->P_dim / BAR_TO_PA);
 		perm_x->InsertNextValue(model->getPerm(cell) * model->R_dim * model->R_dim);
 		perm_y->InsertNextValue(model->getPerm(cell) * model->R_dim * model->R_dim);
 	}
@@ -160,7 +160,7 @@ void VTKSnapshotter<acid2d::Acid2d>::dump(const int i)
 		type->InsertNextValue(cell.type);
 		const auto& var = (*model)[i].u_next;
 		poro->InsertNextValue(var.m);
-		pres->InsertNextValue(var.p * model->P_dim);
+		pres->InsertNextValue(var.p * model->P_dim / BAR_TO_PA);
 		s_wat->InsertNextValue(var.s);
 		s_oil->InsertNextValue(1.0 - var.s);
 		xa->InsertNextValue(var.xa);

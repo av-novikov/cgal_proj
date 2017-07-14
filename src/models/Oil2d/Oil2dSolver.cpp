@@ -156,13 +156,9 @@ void Oil2dSolver::computeJac()
 	for (size_t i = 0; i < size; i++)
 		model->x[i].p <<= model->u_next[i * var_size];
 
-	//adouble isInner, isBorder, isWell;
 	for (int i = 0; i < mesh->inner_cells; i++)
 	{
 		const auto& cell = mesh->cells[i];
-		//isInner = (cell.type == CellType::INNER) ? true : false;
-		//isBorder = (cell.type == CellType::BORDER) ? true : false;
-		// isWell = (cell.type == CellType::WELL) ? true : false;
 		model->h[i] = cell.V * model->solveInner(cell);
 	}
 	for (int i = mesh->border_beg; i < model->cellsNum; i++)
@@ -172,7 +168,11 @@ void Oil2dSolver::computeJac()
 	}
 
 	const int well_idx = mesh->well_idx;
-	model->h[well_idx] += mesh->cells[well_idx].V * model->ht * model->props_oil.getDensity(model->x[well_idx].p) * model->Q_sum;
+	adouble leftIsRate = model->leftBoundIsRate;
+	adouble tmp = model->h[well_idx];
+	condassign(model->h[well_idx], leftIsRate,
+		tmp + model->ht * model->props_oil.getDensity(model->x[well_idx].p) * model->Q_sum,
+		(model->x[well_idx].p - model->Pwf) / model->P_dim);
 
 	for (int i = 0; i < Model::var_size * size; i++)
 		model->h[i] >>= y[i];
@@ -181,8 +181,6 @@ void Oil2dSolver::computeJac()
 }
 void Oil2dSolver::fill()
 {
-	//jacobian(0, Model::var_size * model->cellsNum, Model::var_size * model->cellsNum, &model->u_next[0], jac);
-	//function(0, Model::var_size * model->cellsNum, Model::var_size * model->cellsNum, &model->u_next[0], y);
 	sparse_jac(0, Model::var_size * model->cellsNum, Model::var_size * model->cellsNum, repeat,
 		&model->u_next[0], &elemNum, (unsigned int**)(&ind_i), (unsigned int**)(&ind_j), &a, options);
 

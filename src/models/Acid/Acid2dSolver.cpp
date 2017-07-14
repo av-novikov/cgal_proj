@@ -259,7 +259,7 @@ void Acid2dSolver::computeJac()
 	const int well_idx = mesh->well_idx;
 	TapeVariable& cur = model->x[well_idx];
 	model->h[well_idx * var_size + 1] = (cur.s - (1.0 - model->props_sk[0].s_oc)) / model->P_dim;
-	model->h[well_idx * var_size + 2] += /*mesh->cells[well_idx].V */ model->ht * model->props_w.getDensity(cur.p, cur.xa, cur.xw) * model->Q_sum;
+	model->h[well_idx * var_size + 2] += model->ht * model->props_w.getDensity(cur.p, cur.xa, cur.xw) * model->Q_sum / mesh->cells[well_idx].V;
 	model->h[well_idx * var_size + 3] = (cur.xa - model->xa) / model->P_dim;
 	model->h[well_idx * var_size + 4] = (cur.xw - (1.0 - model->xa)) / model->P_dim;
 
