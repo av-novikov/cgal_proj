@@ -114,7 +114,7 @@ Task* getMeshTask(double& x_dim)
 	typedef Task::Body::Point Point;
 
 	double w = 0.01;
-	x_dim = w * 1.0;		w /= x_dim;
+	x_dim = w * 1000.0;		w /= x_dim;
 	task->spatialStep = 50.0 / x_dim;
 	Task::Body::Border body1border = { { 300 / x_dim, 300 / x_dim },
 										{ -300 / x_dim, 300 / x_dim },

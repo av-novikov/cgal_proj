@@ -92,7 +92,7 @@ void ParSolver::SolveBiCGStab()
 	bicgstab.Build();
 	isAssembled = true;
 
-	bicgstab.Init(1.E-18, 1.E-8, 1E+12, 1000);
+	bicgstab.Init(1.E-25, 1.E-7, 1E+12, 1000);
 	Mat.info();
 
 	//bicgstab.RecordResidualHistory();
@@ -100,7 +100,7 @@ void ParSolver::SolveBiCGStab()
 	status = static_cast<RETURN_TYPE>(bicgstab.GetSolverStatus());
 	//if(status == RETURN_TYPE::DIV_CRITERIA || status == RETURN_TYPE::MAX_ITER)
 	//bicgstab.RecordHistory(resHistoryFile);
-	writeSystem();
+	//writeSystem();
 
 	//getResiduals();
 	//cout << "Initial residual: " << initRes << endl;

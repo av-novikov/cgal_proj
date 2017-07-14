@@ -68,9 +68,9 @@ protected:
 	double wellboreDuration;
 	size_t skeletonsNum;
 
-	virtual void loadMesh(const Task& task)
+	virtual void loadMesh(const Task& task, const double height)
 	{
-		mesh = std::make_shared<Mesh>(task);
+		mesh = std::make_shared<Mesh>(task, height);
 		cellsNum = mesh.get()->getCellsSize();
 		varNum = VarContainer::size * cellsNum;
 	}
@@ -107,7 +107,7 @@ public:
 	void load(const Task& task, const Properties& props)
 	{
 		setProps(props);
-		loadMesh(task);
+		loadMesh(task, props.props_sk[0].height / props.R_dim);
 
 		u_prev.resize(varNum);
 		u_iter.resize(varNum);

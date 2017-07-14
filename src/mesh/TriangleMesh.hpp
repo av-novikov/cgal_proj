@@ -89,6 +89,8 @@ namespace mesh
 		typedef TriangleCell Cell;
 
 		static const int CELL_POINTS_NUMBER = 3;	
+	protected:
+		const double height;
 	public:
 		Triangulation triangulation;
 		size_t inner_cells = 0, inner_beg;
@@ -126,7 +128,7 @@ namespace mesh
 				auto& cell = cells[cells.size() - 1];
 				cell.type = CellType::INNER;
 				const auto& tri = triangulation.triangle(cellIter);
-				cell.V = fabs(tri.area());
+				cell.V = fabs(tri.area() * height);
 				Volume += cell.V;
 				const auto center = CGAL::barycenter(tri.vertex(0), 1.0 / 3.0, tri.vertex(1), 1.0 / 3.0, tri.vertex(2));
 				cell.c = { center[0], center[1] };
@@ -249,7 +251,7 @@ namespace mesh
 		};
 	public:
 		TriangleMesh() { Volume = 0.0; };
-		TriangleMesh(const Task& task)
+		TriangleMesh(const Task& task, const double _height) : height(_height)
 		{
 			Volume = 0.0;
 			load(task);
