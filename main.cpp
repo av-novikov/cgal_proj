@@ -13,7 +13,7 @@ using namespace std;
 using namespace point;
 using namespace mesh;
 
-oil2d::Properties* getProps()
+/*oil2d::Properties* getProps()
 {
 	oil2d::Properties* props = new oil2d::Properties();
 	props->timePeriods.push_back(86400.0 * 20.0);
@@ -46,8 +46,8 @@ oil2d::Properties* getProps()
 	props->alpha = 7200.0;
 
 	return props;
-}
-/*acid2d::Properties* getProps()
+}*/
+acid2d::Properties* getProps()
 {
 	acid2d::Properties* props = new acid2d::Properties();
 
@@ -55,15 +55,15 @@ oil2d::Properties* getProps()
 	props->timePeriods.push_back(30.0 * 3600.0);
 	props->leftBoundIsRate = true;
 	props->rightBoundIsPres = true;
-	props->rates.push_back(0.1);
+	props->rates.push_back(10.0);
 	props->rates.push_back(0.0);
 	//props->pwf.push_back(250.0 * 1.0e+5);
 	//props->pwf.push_back(250.0 * 1.0e+5);
 	props->xa.push_back(0.13);
 	props->xa.push_back(0.0);
 
-	props->ht = 0.1;
-	props->ht_min = 0.1;
+	props->ht = 1.0;
+	props->ht_min = 1.0;
 	props->ht_max = 10000.0;
 
 	props->alpha = 7200.0;
@@ -105,7 +105,7 @@ oil2d::Properties* getProps()
 	props->props_w.p_ref = tmp.p_ref;
 
 	return props;
-}*/
+}
 
 Task* getMeshTask(double& x_dim)
 {
@@ -113,8 +113,8 @@ Task* getMeshTask(double& x_dim)
 
 	typedef Task::Body::Point Point;
 
-	double w = 0.01;
-	x_dim = w * 1000.0;		w /= x_dim;
+	double w = 1;
+	x_dim = w * 0.2;		w /= x_dim;
 	task->spatialStep = 50.0 / x_dim;
 	Task::Body::Border body1border = { { 300 / x_dim, 300 / x_dim },
 										{ -300 / x_dim, 300 / x_dim },
@@ -161,8 +161,8 @@ int main(int argc, char* argv[])
 	const auto props = getProps();
 	const auto task = getMeshTask(props->R_dim);
 	
-	Scene<oil2d::Oil2d, oil2d::Oil2dSolver, oil2d::Properties> scene;
-	//Scene<acid2d::Acid2d, acid2d::Acid2dSolver, acid2d::Properties> scene;
+	//Scene<oil2d::Oil2d, oil2d::Oil2dSolver, oil2d::Properties> scene;
+	Scene<acid2d::Acid2d, acid2d::Acid2dSolver, acid2d::Properties> scene;
 
 	scene.load(*props, *task);
 	scene.start();

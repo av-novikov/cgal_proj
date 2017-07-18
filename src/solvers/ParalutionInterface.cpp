@@ -29,18 +29,18 @@ void ParSolver::Assemble(const int* ind_i, const int* ind_j, const double* a, co
 	Rhs.Zeros();
 	x.Zeros();
 
-	if (isAssembled)
+	/*if (isAssembled)
 	{
 		Mat.AssembleUpdate(a);
 		Rhs.Assemble(ind_rhs, rhs, matSize, "rhs");
-	} else {
+	} else {*/
 		Mat.Assemble(ind_i, ind_j, a, counter, "A", matSize, matSize);
 		Rhs.Assemble(ind_rhs, rhs, matSize, "rhs");
 
 		Mat.MoveToAccelerator();
 		Rhs.MoveToAccelerator();
 		x.MoveToAccelerator();
-	}	
+	//}	
 }
 void ParSolver::Solve()
 {
@@ -92,7 +92,7 @@ void ParSolver::SolveBiCGStab()
 	bicgstab.Build();
 	isAssembled = true;
 
-	bicgstab.Init(1.E-25, 1.E-7, 1E+12, 1000);
+	bicgstab.Init(1.E-25, 1.E-9, 1E+12, 1000);
 	Mat.info();
 
 	//bicgstab.RecordResidualHistory();
@@ -100,7 +100,7 @@ void ParSolver::SolveBiCGStab()
 	status = static_cast<RETURN_TYPE>(bicgstab.GetSolverStatus());
 	//if(status == RETURN_TYPE::DIV_CRITERIA || status == RETURN_TYPE::MAX_ITER)
 	//bicgstab.RecordHistory(resHistoryFile);
-	//writeSystem();
+	writeSystem();
 
 	//getResiduals();
 	//cout << "Initial residual: " << initRes << endl;
@@ -118,7 +118,7 @@ void ParSolver::SolveBiCGStab_Simple()
 	bicgstab.Build();
 	isAssembled = true;
 
-	bicgstab.Init(1.E-20, 1.E-12, 1E+12, 500);
+	bicgstab.Init(1.E-30, 1.E-12, 1E+12, 1000);
 	Mat.info();
 
 	//bicgstab.RecordResidualHistory();

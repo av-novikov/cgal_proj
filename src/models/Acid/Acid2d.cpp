@@ -71,7 +71,7 @@ void Acid2d::makeDimLess()
 {
 	T_dim = Component::T;
 	t_dim = 3600.0;
-	P_dim = props_sk[0].p_init;
+	P_dim = 100.0 * props_sk[0].p_init;
 
 	Component::p_std /= P_dim;
 	Component::R /= (P_dim * R_dim * R_dim * R_dim / T_dim);
@@ -180,13 +180,14 @@ TapeVariable Acid2d::solveInner(const Cell& cell)
 	TapeVariable res;
 	res.m = (1.0 - cur.m) * props.getDensity(cur.p) - (1.0 - prev.m) * props.getDensity(prev.p) -
 		ht * reac.indices[REACTS::CALCITE] * reac.comps[REACTS::CALCITE].mol_weight * rate;
-	res.p = cur.m * (1.0 - cur.s) * props_o.getDensity(cur.p) -
-		prev.m * (1.0 - prev.s) * props_o.getDensity(prev.p);
-	res.s = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) -
+	res.p = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) -
 		prev.m * prev.s * props_w.getDensity(prev.p, prev.xa, prev.xw) -
 		ht * (reac.indices[REACTS::ACID] * reac.comps[REACTS::ACID].mol_weight +
 			reac.indices[REACTS::WATER] * reac.comps[REACTS::WATER].mol_weight +
 			reac.indices[REACTS::SALT] * reac.comps[REACTS::SALT].mol_weight) * rate;
+	res.s = cur.m * (1.0 - cur.s) * props_o.getDensity(cur.p) -
+		prev.m * (1.0 - prev.s) * props_o.getDensity(prev.p);
+	double qwe = (*this)[cell.id].u_next.m * (*this)[cell.id].u_next.s * props_w.getDensity(cur.p, cur.xa, cur.xw).value();
 	res.xa = cur.m * cur.s * props_w.getDensity(cur.p, cur.xa, cur.xw) * cur.xa -
 		prev.m * prev.s * props_w.getDensity(prev.p, prev.xa, prev.xw) * prev.xa -
 		ht * reac.indices[REACTS::ACID] * reac.comps[REACTS::ACID].mol_weight * rate;
@@ -213,8 +214,8 @@ TapeVariable Acid2d::solveInner(const Cell& cell)
 		adouble buf_o = ht / cell.V * getTrans(cell, i, beta) * (cur.p - nebr.p) *
 			dens_o * props_o.getKr(upwd.s, props);
 
-		res.p += buf_o;
-		res.s += buf_w;
+		res.p += buf_w;
+		res.s += buf_o;
 		res.xa += buf_w * upwd.xa;
 		res.xw += buf_w * upwd.xw;
 	}

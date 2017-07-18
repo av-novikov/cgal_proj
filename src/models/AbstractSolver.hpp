@@ -91,7 +91,7 @@ public:
 	{
 		int counter = 0;
 
-		for (const auto& cell : mesh->cells)
+		/*for (const auto& cell : mesh->cells)
 		{
 			getMatrixStencil(cell);
 			for (size_t i = 0; i < var_size; i++)
@@ -103,7 +103,7 @@ public:
 			stencil_idx.clear();
 		}
 
-		elemNum = counter;
+		elemNum = counter;*/
 		for (int i = 0; i < var_size * model->cellsNum; i++)
 			ind_rhs[i] = i;
 	}

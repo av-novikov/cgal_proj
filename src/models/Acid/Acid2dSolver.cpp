@@ -246,20 +246,24 @@ void Acid2dSolver::computeJac()
 		model->h[var_size * i + 3] = tmp.xa;
 		model->h[var_size * i + 4] = tmp.xw;
 	}
-/*	for (size_t i = 0; i < mesh->fracCells.size(); i++)
+	/*for (size_t i = 0; i < mesh->fracCells.size(); i++)
 	{
 		const auto& cell = *mesh->fracCells[i];
-		model->h[var_size * cell.id] *= sqrt(cell.V);
-		model->h[var_size * cell.id + 1] *= sqrt(cell.V);
-		model->h[var_size * cell.id + 2] *= sqrt(cell.V);
-		model->h[var_size * cell.id + 3] *= sqrt(cell.V);
-		model->h[var_size * cell.id + 4] *= sqrt(cell.V);
+		model->h[var_size * cell.id] /= sqrt(cell.V);
+		model->h[var_size * cell.id + 1] /= sqrt(cell.V);
+		model->h[var_size * cell.id + 2] /= sqrt(cell.V);
+		model->h[var_size * cell.id + 3] /= sqrt(cell.V);
+		model->h[var_size * cell.id + 4] /= sqrt(cell.V);
 	}*/
 	// Well cell
 	const int well_idx = mesh->well_idx;
 	TapeVariable& cur = model->x[well_idx];
-	model->h[well_idx * var_size + 1] = (cur.s - (1.0 - model->props_sk[0].s_oc)) / model->P_dim;
-	model->h[well_idx * var_size + 2] += model->ht * model->props_w.getDensity(cur.p, cur.xa, cur.xw) * model->Q_sum / mesh->cells[well_idx].V;
+	adouble leftIsRate = model->leftBoundIsRate;
+	adouble tmp = model->h[well_idx * var_size + 1];
+	condassign(model->h[well_idx * var_size + 1], leftIsRate,
+		tmp - model->ht * model->props_w.getDensity(cur.p, cur.xa, cur.xw) * model->Q_sum / mesh->cells[well_idx].V,
+		(cur.p - model->Pwf) / model->P_dim);
+	model->h[well_idx * var_size + 2] = (cur.s - (1.0 - model->props_sk[0].s_oc)) / model->P_dim;
 	model->h[well_idx * var_size + 3] = (cur.xa - model->xa) / model->P_dim;
 	model->h[well_idx * var_size + 4] = (cur.xw - (1.0 - model->xa)) / model->P_dim;
 
