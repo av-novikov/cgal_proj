@@ -1,6 +1,7 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
+#include "src/util/utils.h"
 #include "src/Scene.hpp"
 
 #include "src/models/Oil2d/Oil2d.hpp"
@@ -12,6 +13,10 @@
 using namespace std;
 using namespace point;
 using namespace mesh;
+
+typedef Task::Body::Point Point;
+
+#define CIRC_NUM 20
 
 /*oil2d::Properties* getProps()
 {
@@ -62,8 +67,8 @@ acid2d::Properties* getProps()
 	props->xa.push_back(0.13);
 	props->xa.push_back(0.0);
 
-	props->ht = 1.0;
-	props->ht_min = 1.0;
+	props->ht = 10.0;
+	props->ht_min = 10.0;
 	props->ht_max = 10000.0;
 
 	props->alpha = 7200.0;
@@ -107,49 +112,119 @@ acid2d::Properties* getProps()
 	return props;
 }
 
-Task* getMeshTask(double& x_dim)
+void getFracPoints(Point2d point1, Point2d point2, const double w, const double r_w, vector<Point>& pts)
+{
+	const size_t size = pts.size();
+	pts.clear();
+	const double k = (point2.y - point1.y) / (point2.x - point1.x);
+	const double alpha = atan(k);
+	const double l = distance(point1, point2) / 2.0;
+
+	double z_prev1 = l * pow(l / r_w, -2.0 / (double)(size - 1)), z_prev2 = r_w;
+	double logMax_z = log(l / r_w);
+	double logStep_z = 2.0 * logMax_z / (double)(size - 1);
+
+	Point pt1 = { point1.x + w / 2.0 * sin(alpha), point1.y - w / 2.0 * cos(alpha) };
+	Point pt2 = { point2.x + w / 2.0 * sin(alpha), point2.y - w / 2.0 * cos(alpha) };
+	Point pt3 = pt2;		pt3[0] -= w * sin(alpha);		pt3[1] += w * cos(alpha);
+	Point pt4 = pt1;		pt4[0] -= w * sin(alpha);		pt4[1] += w * cos(alpha);
+	Point2d well_pt = (point1 + point2) / 2.0;
+
+	Point p1;
+	double upcoord, hz = 0.0, cm_z = 0.0, hz_prev = 0.0;
+	p1 = pt1;
+	pts.push_back({ pt1[0], pt1[1] });
+	for (int i = 0; i < size; i++)
+	{
+		upcoord = cm_z + hz / 2.0 + r_w;
+		if (upcoord < l - EQUALITY_TOLERANCE)
+		{
+			hz = z_prev1 * (exp(logStep_z) - 1.0);
+			z_prev1 *= exp(-logStep_z);
+		}
+		else if (upcoord < l + r_w - EQUALITY_TOLERANCE)
+		{
+			hz = 2.0 * r_w;
+			const double hphi = (pts[pts.size()-1][0] - pts[pts.size() - 2][0] > 0.0) ? M_PI / (double)(CIRC_NUM + 1) : -M_PI / (double)(CIRC_NUM + 1);
+			const double start_phi = (point2.x - point1.x < 0.0) ? alpha : M_PI + alpha;
+			for (int j = 1; j <= CIRC_NUM; j++)
+				pts.push_back({ well_pt.x + r_w * cos(start_phi + (double)j * hphi), well_pt.y + r_w * sin(start_phi + (double)j * hphi) });
+		}
+		else
+		{
+			hz = z_prev2 * (exp(logStep_z) - 1.0);
+			z_prev2 *= exp(logStep_z);
+		}
+
+		cm_z += (hz_prev + hz) / 2.0;
+		hz_prev = hz;
+
+		pts.push_back({ pt1[0] + sign(point2.x - point1.x) * (cm_z + hz / 2.0) * cos(alpha), pt1[1] + sign(point2.y - point1.y) * (cm_z + hz / 2.0) * sin(fabs(alpha)) });
+		//p2 = { pt1[0] + (cm_z + hz / 2.0) * cos(alpha), pt1[1] + (cm_z + hz / 2.0) * sin(alpha) };
+		//task->bodies[0].constraint.push_back(make_pair(p1, p2));
+		//p1 = p2;
+	}
+	pts.push_back({ pt3[0], pt3[1] });
+	//task->bodies[0].constraint.push_back(make_pair(p2, pt3));
+
+	cm_z = 0.0;
+	p1 = pt3;
+	z_prev1 = l * pow(l / r_w, -2.0 / (double)(size - 1));
+	z_prev2 = r_w;
+	hz_prev = hz = 0.0;
+	for (int i = 0; i < size; i++)
+	{
+		upcoord = cm_z + hz / 2.0 + r_w;
+		if (upcoord < l - EQUALITY_TOLERANCE)
+		{
+			hz = z_prev1 * (exp(logStep_z) - 1.0);
+			z_prev1 *= exp(-logStep_z);
+		}
+		else if (upcoord < l + r_w - EQUALITY_TOLERANCE)
+		{
+			hz = 2.0 * r_w;
+			const double hphi = (pts[pts.size() - 2][0] - pts[pts.size() - 1][0] > 0.0) ? M_PI / (double)(CIRC_NUM + 1) : -M_PI / (double)(CIRC_NUM + 1);
+			const double start_phi = (point1.x - point2.x < 0.0) ? alpha : M_PI + alpha;
+			for (int j = 1; j <= CIRC_NUM; j++)
+				pts.push_back({ well_pt.x + r_w * cos(start_phi + (double)j * hphi), well_pt.y + r_w * sin(start_phi + (double)j * hphi) });
+		}
+		else
+		{
+			hz = z_prev2 * (exp(logStep_z) - 1.0);
+			z_prev2 *= exp(logStep_z);
+		}
+
+		cm_z += (hz_prev + hz) / 2.0;
+		hz_prev = hz;
+
+		pts.push_back({ pt3[0] - sign(point2.x - point1.x) * (cm_z + hz / 2.0) * cos(alpha), pt3[1] - sign(point2.y - point1.y) * (cm_z + hz / 2.0) * sin(fabs(alpha)) });
+		//p2 = { pt3[0] - (cm_z + hz / 2.0) * cos(alpha), pt3[1] - (cm_z + hz / 2.0) * sin(alpha) };
+		//task->bodies[0].constraint.push_back(make_pair(p1, p2));
+		//p1 = p2;
+	}
+	//task->bodies[0].constraint.push_back(make_pair(p2, pt1));
+}
+Task* getMeshTask(double& x_dim, double r_w)
 {
 	Task* task = new Task;
 
-	typedef Task::Body::Point Point;
+	double w = 0.01;
+	x_dim = w * 20;		w /= x_dim;
+	r_w /= x_dim;
+	const double a = 300.0 / x_dim;
+	const double l = 100.0 / x_dim;
 
-	double w = 1;
-	x_dim = w * 0.2;		w /= x_dim;
 	task->spatialStep = 50.0 / x_dim;
-	Task::Body::Border body1border = { { 300 / x_dim, 300 / x_dim },
-										{ -300 / x_dim, 300 / x_dim },
-										{ -300 / x_dim, -300 / x_dim },
-										{ 300 / x_dim, -300 / x_dim } };
-	//Task::Body::Border body2border = { { 3, 3 },{ 9, 3 },{ 9, -3 },{ 3, -3 } };
+	Task::Body::Border body1border = { { a, a }, { -a, a }, { -a, -a }, { a, -a } };
 	task->bodies = { Task::Body({ 0, body1border,{} }) };
 
-	Point pt1 = { -100 / x_dim, w / 2.0 / x_dim };			Point pt2 = { 100 / x_dim, w / 2.0 / x_dim };
-	Point pt3 = pt2;		pt3[1] -= w;
-	Point pt4 = pt1;		pt4[1] -= w;
-
-	const int SIZE = 1;
-	double dx = (pt2[0] - pt1[0]) / (double)SIZE;
-	double dy = (pt2[1] - pt1[1]) / (double)SIZE;
-	Point p1, p2;
-	for (int i = 0; i < SIZE - 1; i++)
-	{
-		p1 = { pt1[0] + (double)i * dx, pt1[1] + (double)i * dy };
-		p2 = { pt1[0] + (double)(i + 1) * dx, pt1[1] + (double)(i + 1) * dy };
-		task->bodies[0].constraint.push_back(make_pair(p1, p2));
-	}
-	task->bodies[0].constraint.push_back(make_pair(pt1, pt2));
-	task->bodies[0].constraint.push_back(make_pair(pt2, pt3));
-
-	dx = (pt4[0] - pt3[0]) / (double)SIZE;
-	dy = (pt4[1] - pt3[1]) / (double)SIZE;
-	for (int i = 0; i < SIZE - 1; i++)
-	{
-		p1 = { pt3[0] + (double)i * dx, pt3[1] + (double)i * dy };
-		p2 = { pt3[0] + (double)(i + 1) * dx, pt3[1] + (double)(i + 1) * dy };
-		task->bodies[0].constraint.push_back(make_pair(p1, p2));
-	}
-	task->bodies[0].constraint.push_back(make_pair(pt3, pt4));
-	task->bodies[0].constraint.push_back(make_pair(pt4, pt1));
+	const size_t size = 101;
+	vector<Point> pts(size);
+	Point2d pt1 = { l, l }, pt2 = { -l, -l };
+	getFracPoints(pt1, pt2, w, r_w, pts);
+	for(size_t i = 1; i < pts.size(); i++)
+		task->bodies[0].constraint.push_back(make_pair(pts[i-1], pts[i]));
+	task->bodies[0].constraint.push_back(make_pair(pts[pts.size()-1], pts[0]));
 
 	return task;
 }
@@ -159,7 +234,7 @@ double acid2d::Component::T = 300.0;
 int main(int argc, char* argv[])
 {
 	const auto props = getProps();
-	const auto task = getMeshTask(props->R_dim);
+	const auto task = getMeshTask(props->R_dim, props->r_w);
 	
 	//Scene<oil2d::Oil2d, oil2d::Oil2dSolver, oil2d::Properties> scene;
 	Scene<acid2d::Acid2d, acid2d::Acid2dSolver, acid2d::Properties> scene;
