@@ -215,12 +215,13 @@ Task* getMeshTask(double& x_dim, double r_w)
 	const double l = 100.0 / x_dim;
 
 	task->spatialStep = 50.0 / x_dim;
+	Point2d pt1 = { l, l }, pt2 = { -l, -l };
+	Point2d pt_well = (pt1 + pt2) / 2.0;
 	Task::Body::Border body1border = { { a, a }, { -a, a }, { -a, -a }, { a, -a } };
-	task->bodies = { Task::Body({ 0, body1border,{} }) };
+	task->bodies = { Task::Body({ 0, r_w, {pt_well.x, pt_well.y}, body1border,{} }) };
 
 	const size_t size = 101;
 	vector<Point> pts(size);
-	Point2d pt1 = { l, l }, pt2 = { -l, -l };
 	getFracPoints(pt1, pt2, w, r_w, pts);
 	for(size_t i = 1; i < pts.size(); i++)
 		task->bodies[0].constraint.push_back(make_pair(pts[i-1], pts[i]));

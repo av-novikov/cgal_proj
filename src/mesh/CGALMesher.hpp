@@ -40,6 +40,8 @@ namespace cgalmesher
 			typedef std::pair<Point, Point> Edge;
 
 			size_t id;                 ///< will be set to cells info
+			double r_w;
+			Point well;
 			Border outer;              ///< outer border of the body
 			std::vector<Border> inner; ///< borders of the inner cavities of the body
 			std::vector<Edge> constraint;
@@ -48,14 +50,16 @@ namespace cgalmesher
 		struct CgalBody 
 		{
 			typedef K::Point_2 Point;
-			size_t id;                  ///< will be set to cells info
+			const size_t id;                  ///< will be set to cells info
+			const double r_w;
+			const Point well;
 			Polygon outer;              ///< outer border of the body
 			std::vector<Polygon> inner; ///< borders of the inner cavities of the body
 			std::vector<std::pair<Point,Point>> constraint;
 			Polygon frac;
 			
 
-			CgalBody(const TaskBody& task) : id(task.id), outer(makePolygon(task.outer))
+			CgalBody(const TaskBody& task) : id(task.id), outer(makePolygon(task.outer)), r_w(task.r_w), well(task.well[0], task.well[1])
 			{
 				for (const auto& cavity : task.inner) 
 					inner.push_back(makePolygon(cavity));

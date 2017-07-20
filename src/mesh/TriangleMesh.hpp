@@ -25,6 +25,8 @@ struct Task
 		typedef std::pair<Point, Point> Edge;
 
 		size_t id;                  ///< body indicator > 0 @see Task::Body
+		double r_w;
+		Point well;
 		Border outer;               ///< outer border of the body
 		std::vector<Border> inner;  ///< borders of the inner cavities
 		std::vector<Edge> constraint;
@@ -100,7 +102,28 @@ namespace mesh
 		std::vector<TriangleCell> cells;
 		std::vector<VertexHandle> vertexHandles;
 		std::vector<TriangleCell*> fracCells;
+		std::vector<TriangleCell*> wellCells;
+		struct WellNebr
+		{
+			size_t id;
+			double length;
+			double dist;
+		};
+		std::vector<WellNebr> wellNebrs;
+		double well_vol;
 		double Volume;
+
+		double getDistance(const Cell& cell, const Cell& beta)
+		{
+			if (cell.type == CellType::WELL)
+			{
+				for (const auto& nebr : wellNebrs)
+					if (nebr.id == beta.id)
+						return nebr.dist;
+			}
+			else
+				return beta.getDistance(cell.id);
+		}
 
 		void load(const Task& task)
 		{
@@ -108,7 +131,7 @@ namespace mesh
 			typedef cgalmesher::Cgal2DMesher::TaskBody Body;
 			std::vector<Body> bodies;
 			for (const auto& b : task.bodies)
-				bodies.push_back({ b.id, b.outer, b.inner, b.constraint });
+				bodies.push_back({ b.id, b.r_w, b.well, b.outer, b.inner, b.constraint });
 
 			// Triangulation sends addtional info about constraints
 			std::vector<size_t> constrainedCells;
@@ -190,8 +213,8 @@ namespace mesh
 			Polygon frac;
 			for (const auto& con : task.bodies[0].constraint)
 				frac.push_back(CgalPoint2(con.first[0], con.first[1]));
+
 			cell_idx = 0;
-			point::Point2d well_pos = { 0.0, 0.0 };
 			for (auto cellIter = triangulation.finite_faces_begin(); cellIter != triangulation.finite_faces_end(); ++cellIter)
 			{
 				auto& cell = cells[cell_idx];
@@ -200,19 +223,52 @@ namespace mesh
 				{
 					cell.type = CellType::FRAC;
 					fracCells.push_back(&cell);
-					well_pos.x += center[0];		well_pos.y += center[1];
 				}
 
 				cell_idx++;
 			}
-			well_pos.x /= fracCells.size();		well_pos.y /= fracCells.size();
 
+			point::Point2d well_pt = { task.bodies[0].well[0], task.bodies[0].well[1] };
 			std::vector<CellHandle> well_faces;
 			std::back_insert_iterator<std::vector<CellHandle>> it(well_faces);
-			it = triangulation.get_conflicts(CgalPoint2(well_pos.x, well_pos.y), std::back_inserter(well_faces));
-
+			it = triangulation.get_conflicts(CgalPoint2(well_pt.x, well_pt.y), std::back_inserter(well_faces));
 			well_idx = well_faces[0]->info().id;
 			cells[well_idx].type = CellType::WELL;
+
+			cells.push_back(TriangleCell(cells.size()));
+			auto& well_cell = cells[cells.size() - 1];
+			well_cell.type = CellType::WELL;
+			well_cell.c = well_pt;
+			well_vol = 0.0;
+			for (auto& fcell : fracCells)
+			{
+				const double dist = point::distance(well_pt, fcell->c);
+				if (dist < task.bodies[0].r_w)
+				{
+					fcell->type = CellType::WELL;
+					wellCells.push_back(fcell);
+					well_vol += fcell->V;
+				}
+			}
+			cellIter = triangulation.finite_faces_begin();
+			for (size_t cell_idx = 0; cell_idx < inner_cells; cell_idx++)
+			{
+				auto& cell = cells[cell_idx];
+				if (cell.type == CellType::INNER || cell.type == CellType::FRAC)
+				{
+					for (size_t i = 0; i < CELL_POINTS_NUMBER; i++)
+						if (cells[cell.nebr[i]].type == CellType::WELL)
+						{
+							cell.nebr[i] = cells.size() - 1;
+							const point::Point2d& pt1 = { cellIter->vertex(cellIter->cw(i))->point()[0], cellIter->vertex(cellIter->cw(i))->point()[1] };
+							const point::Point2d& pt2 = { cellIter->vertex(cellIter->ccw(i))->point()[0], cellIter->vertex(cellIter->ccw(i))->point()[1] };
+							wellNebrs.push_back({ cell.id, cell.length[i], point::distance(well_cell.c, (pt1 + pt2) / 2.0) });
+						}
+				}
+				++cellIter;
+			}
+
+
 			// Creating constrained cells
 /*			constrained_beg = cells.size();
 			cellIter = triangulation.finite_faces_begin();
