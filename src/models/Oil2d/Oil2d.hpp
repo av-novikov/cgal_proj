@@ -34,13 +34,29 @@ namespace oil2d
 		{
 			const double k1 = getPerm(cell1);
 			const double k2 = getPerm(cell2);
-			const double dist1 = cell1.dist[idx];
-			const double dist2 = cell2.getDistance(cell1.id);
-			return props_sk[0].height * cell1.length[idx] * k1 * k2 / (k1 * dist2 + k2 * dist1);
+			const double dist1 = getDistance(cell1, cell2);
+			const double dist2 = getDistance(cell2, cell1);
+			if(cell1.type == CellType::WELL)
+				return props_sk[0].height * mesh->wellNebrs[idx].length * k1 * k2 / (k1 * dist2 + k2 * dist1);
+			else
+				return props_sk[0].height * cell1.length[idx] * k1 * k2 / (k1 * dist2 + k2 * dist1);
+		};
+		const double& getDistance(const Cell& cell, const Cell& beta) const
+		{
+			if (cell.type == CellType::WELL && beta.type != CellType::WELL)
+			{
+				for (const auto& nebr : mesh->wellNebrs)
+					if (nebr.id == beta.id)
+						return nebr.dist;
+				return 0.0;
+			}
+			else
+				return cell.getDistance(beta.id);
 		};
 
 		adouble solveInner(const Cell& cell);
 		adouble solveBorder(const Cell& cell);
+		adouble solveWell(const Cell& cell);
 	public:
 		Oil2d();
 		~Oil2d();

@@ -18,7 +18,7 @@ typedef Task::Body::Point Point;
 
 #define CIRC_NUM 20
 
-/*oil2d::Properties* getProps()
+oil2d::Properties* getProps()
 {
 	oil2d::Properties* props = new oil2d::Properties();
 	props->timePeriods.push_back(86400.0 * 20.0);
@@ -26,12 +26,12 @@ typedef Task::Body::Point Point;
 	props->leftBoundIsRate = true;
 	props->rightBoundIsPres = true;
 	props->rates.push_back(100.0);
-	props->ht = 100.0;
-	props->ht_min = 100.0;
+	props->ht = 1000.0;
+	props->ht_min = 1000.0;
 	props->ht_max  = 100000.0;
 
 	props->perfIntervals.push_back( make_pair(0, 0) );
-	props->r_w = 0.1;
+	props->r_w = 10;
 	props->r_e = 1000.0;
 
 	oil2d::Skeleton_Props tmp;
@@ -51,8 +51,8 @@ typedef Task::Body::Point Point;
 	props->alpha = 7200.0;
 
 	return props;
-}*/
-acid2d::Properties* getProps()
+}
+/*acid2d::Properties* getProps()
 {
 	acid2d::Properties* props = new acid2d::Properties();
 
@@ -110,7 +110,7 @@ acid2d::Properties* getProps()
 	props->props_w.p_ref = tmp.p_ref;
 
 	return props;
-}
+}*/
 
 void getFracPoints(Point2d point1, Point2d point2, const double w, const double r_w, vector<Point>& pts)
 {
@@ -208,11 +208,11 @@ Task* getMeshTask(double& x_dim, double r_w)
 {
 	Task* task = new Task;
 
-	double w = 0.01;
-	x_dim = w * 20;		w /= x_dim;
+	double w = 1;
+	x_dim = w * 10.0;		w /= x_dim;
 	r_w /= x_dim;
 	const double a = 300.0 / x_dim;
-	const double l = 100.0 / x_dim;
+	const double l = 50.0 / x_dim;
 
 	task->spatialStep = 50.0 / x_dim;
 	Point2d pt1 = { l, l }, pt2 = { -l, -l };
@@ -237,8 +237,8 @@ int main(int argc, char* argv[])
 	const auto props = getProps();
 	const auto task = getMeshTask(props->R_dim, props->r_w);
 	
-	//Scene<oil2d::Oil2d, oil2d::Oil2dSolver, oil2d::Properties> scene;
-	Scene<acid2d::Acid2d, acid2d::Acid2dSolver, acid2d::Properties> scene;
+	Scene<oil2d::Oil2d, oil2d::Oil2dSolver, oil2d::Properties> scene;
+	//Scene<acid2d::Acid2d, acid2d::Acid2dSolver, acid2d::Properties> scene;
 
 	scene.load(*props, *task);
 	scene.start();

@@ -229,13 +229,14 @@ namespace mesh
 			}
 
 			point::Point2d well_pt = { task.bodies[0].well[0], task.bodies[0].well[1] };
-			std::vector<CellHandle> well_faces;
+			/*std::vector<CellHandle> well_faces;
 			std::back_insert_iterator<std::vector<CellHandle>> it(well_faces);
 			it = triangulation.get_conflicts(CgalPoint2(well_pt.x, well_pt.y), std::back_inserter(well_faces));
 			well_idx = well_faces[0]->info().id;
-			cells[well_idx].type = CellType::WELL;
+			cells[well_idx].type = CellType::WELL;*/
 
 			cells.push_back(TriangleCell(cells.size()));
+			well_idx = cells.size() - 1;
 			auto& well_cell = cells[cells.size() - 1];
 			well_cell.type = CellType::WELL;
 			well_cell.c = well_pt;

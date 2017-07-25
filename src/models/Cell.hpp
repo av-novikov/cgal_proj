@@ -27,7 +27,7 @@
 				if (nebr[i] == idx)
 					return dist[i];
 			}
-			exit(-1);
+			return 0.0;
 		};
 	};
 

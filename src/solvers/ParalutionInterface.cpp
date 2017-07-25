@@ -51,7 +51,6 @@ void ParSolver::Solve()
 }
 void ParSolver::Solve(const PRECOND key)
 {
-	//SolveGMRES();
 	if (key == PRECOND::ILU_SERIOUS)
 		SolveBiCGStab();
 	else if (key == PRECOND::ILU_SIMPLE)
@@ -87,7 +86,7 @@ void ParSolver::SolveBiCGStab()
 {
 	bicgstab.SetOperator(Mat);
 	//p.Set(1.E-15, 100);
-	p.Set(4);
+	p.Set(0);
 	bicgstab.SetPreconditioner(p);
 	bicgstab.Build();
 	isAssembled = true;

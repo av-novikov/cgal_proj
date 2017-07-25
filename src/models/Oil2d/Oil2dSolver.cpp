@@ -127,7 +127,7 @@ void Oil2dSolver::solveStep()
 		computeJac();
 		fill();
 		solver.Assemble(ind_i, ind_j, a, elemNum, ind_rhs, rhs);
- 		solver.Solve(PRECOND::ILU_SERIOUS);
+ 		solver.Solve(PRECOND::ILU_SIMPLE);
 		copySolution(solver.getSolution());
 
 		//if (repeat == 0)
@@ -156,20 +156,23 @@ void Oil2dSolver::computeJac()
 	for (size_t i = 0; i < size; i++)
 		model->x[i].p <<= model->u_next[i * var_size];
 
+	const int well_idx = model->cellsNum - 1;
 	for (int i = 0; i < mesh->inner_cells; i++)
 	{
 		const auto& cell = mesh->cells[i];
-		model->h[i] = cell.V * model->solveInner(cell);
+		adouble isWellCell = (cell.type == CellType::WELL) ? true : false;
+		condassign(model->h[i], isWellCell,
+			(model->x[cell.id].p - model->x[well_idx].p) / model->P_dim,
+			cell.V * model->solveInner(cell));
 	}
-	for (int i = mesh->border_beg; i < model->cellsNum; i++)
+	for (int i = mesh->border_beg; i < model->cellsNum - 1; i++)
 	{
 		const auto& cell = mesh->cells[i];
 		model->h[i] = model->solveBorder(cell);
 	}
-
-	const int well_idx = mesh->well_idx;
+	
 	adouble leftIsRate = model->leftBoundIsRate;
-	adouble tmp = model->h[well_idx];
+	adouble tmp = model->solveWell(mesh->cells[well_idx]);
 	condassign(model->h[well_idx], leftIsRate,
 		tmp + model->ht * model->props_oil.getDensity(model->x[well_idx].p) * model->Q_sum,
 		(model->x[well_idx].p - model->Pwf) / model->P_dim);
